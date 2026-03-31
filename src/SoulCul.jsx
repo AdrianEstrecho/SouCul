@@ -79,6 +79,18 @@ function LoginRequiredModal({ onClose, onGoToLogin }) {
 })();
 
 export default function SoulCul() {
+  // Ctrl+Alt+. shortcut to open admin panel
+  useEffect(() => {
+    const handleAdminShortcut = (e) => {
+      if (e.ctrlKey && e.altKey && e.key === ".") {
+        e.preventDefault();
+        window.location.href = "/admin.html";
+      }
+    };
+    window.addEventListener("keydown", handleAdminShortcut);
+    return () => window.removeEventListener("keydown", handleAdminShortcut);
+  }, []);
+
   const [cartItems, setCartItems] = useState([]);
   const [directCheckoutItem, setDirectCheckoutItem] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("soulcul_loggedIn") === "true");

@@ -20,8 +20,29 @@ const UserIcon = () => (
   </svg>
 );
 
+const BellIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
 export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const [showGuestMsg, setShowGuestMsg] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState(() => {
+    const currentUser = localStorage.getItem("soulcul_currentUser");
+    if (currentUser && currentUser !== "guest") {
+      const stored = localStorage.getItem(`soulcul_notifications_${currentUser}`);
+      if (stored) return JSON.parse(stored);
+    }
+    return [
+      { id: 1, text: "Welcome to SoulCul! Explore local products from across the Philippines.", time: "Just now", read: false },
+      { id: 2, text: "New arrivals from Vigan — handwoven textiles and Abel cloth now available!", time: "2h ago", read: false },
+      { id: 3, text: "Your order has been confirmed and is being prepared.", time: "1d ago", read: true },
+    ];
+  });
+  const notifRef = useRef(null);
   const isGuest = localStorage.getItem("soulcul_currentUser") === "guest";
   const isLoggedIn = localStorage.getItem("soulcul_loggedIn") === "true";
   const navigate = useNavigate();
@@ -55,6 +76,38 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
     setSearchOpen(false);
     setSearchQuery("");
   };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const saveNotifications = (updated) => {
+    const currentUser = localStorage.getItem("soulcul_currentUser");
+    if (currentUser && currentUser !== "guest") {
+      localStorage.setItem(`soulcul_notifications_${currentUser}`, JSON.stringify(updated));
+    }
+  };
+
+  const markAsRead = (id) => {
+    const updated = notifications.map((n) => n.id === id ? { ...n, read: true } : n);
+    setNotifications(updated);
+    saveNotifications(updated);
+  };
+
+  const markAllRead = () => {
+    const updated = notifications.map((n) => ({ ...n, read: true }));
+    setNotifications(updated);
+    saveNotifications(updated);
+  };
+
+  // Close notification dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifOpen]);
 
   return (
     <nav className={`navbar${scrolled ? " scrolled" : ""}`}>
@@ -113,6 +166,51 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
             <button className="icon-btn" onClick={() => setSearchOpen(true)}>
               <SearchIcon />
             </button>
+          )}
+        </div>
+
+        {/* Notification Bell */}
+        <div className="icon-pill notif-pill" ref={notifRef}>
+          <button className="icon-btn notif-btn" onClick={() => {
+            if (!isLoggedIn || isGuest) { setShowGuestMsg(true); setTimeout(() => setShowGuestMsg(false), 3000); return; }
+            setNotifOpen((prev) => !prev);
+          }}>
+            <BellIcon size={22} />
+            {isLoggedIn && !isGuest && unreadCount > 0 && (
+              <span className="notif-badge">{unreadCount}</span>
+            )}
+          </button>
+
+          {notifOpen && (
+            <div className="notif-dropdown">
+              <div className="notif-header">
+                <span className="notif-title">Notifications</span>
+                {unreadCount > 0 && (
+                  <button className="notif-mark-all" onClick={markAllRead}>Mark all read</button>
+                )}
+              </div>
+              <div className="notif-list">
+                {notifications.length === 0 ? (
+                  <div className="notif-empty">No notifications yet</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`notif-item${n.read ? "" : " notif-unread"}`}
+                      onClick={() => markAsRead(n.id)}
+                    >
+                      <div className="notif-dot-wrapper">
+                        {!n.read && <span className="notif-dot" />}
+                      </div>
+                      <div className="notif-content">
+                        <p className="notif-text">{n.text}</p>
+                        <span className="notif-time">{n.time}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           )}
         </div>
 
