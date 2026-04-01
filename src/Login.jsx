@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import mapBg from "./assets/PhilippineMap.png";
+import mapBg from "./assets/mapbg.png";
 
 const PW_RULES = [
   { key: "length", label: "At least 8 characters", test: (v) => v.length >= 8 },
@@ -187,10 +187,6 @@ export default function Login({ onLogin, onGuestLogin }) {
               <button className="auth-btn auth-btn-outline" onClick={switchToSignup}>SIGN UP</button>
               <button className="auth-btn auth-btn-solid" onClick={handleLogin}>LOG IN</button>
             </div>
-            <div className="auth-divider"><span>or</span></div>
-            <button className="auth-guest-btn" onClick={() => { if (onGuestLogin) onGuestLogin(); navigate("/"); }}>
-              Continue as Guest
-            </button>
           </div>
         </div>
       )}
