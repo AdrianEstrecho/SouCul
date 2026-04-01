@@ -36,11 +36,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
       const stored = localStorage.getItem(`soulcul_notifications_${currentUser}`);
       if (stored) return JSON.parse(stored);
     }
-    return [
-      { id: 1, text: "Welcome to SoulCul! Explore local products from across the Philippines.", time: "Just now", read: false },
-      { id: 2, text: "New arrivals from Vigan — handwoven textiles and Abel cloth now available!", time: "2h ago", read: false },
-      { id: 3, text: "Your order has been confirmed and is being prepared.", time: "1d ago", read: true },
-    ];
+    return [];
   });
   const notifRef = useRef(null);
   const isGuest = localStorage.getItem("soulcul_currentUser") === "guest";
@@ -50,6 +46,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const getActiveNav = () => {
     if (location.pathname === "/" || location.pathname === "/Map") return "Home";
     if (location.pathname === "/AboutUs") return "About Us";
+    if (location.pathname === "/Profile" || location.pathname === "/Cart" || location.pathname === "/Checkout") return null;
     return "Products";
   };
   const [activeNav, setActiveNav] = useState(getActiveNav);
@@ -114,7 +111,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
 
       <div className="navbar-left">
         {!hideBackButton && (
-          <button className="btn-back" onClick={() => onGoHome ? onGoHome() : window.history.back()}>
+          <button className="btn-back" onClick={() => onGoHome ? onGoHome() : navigate("/")}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="m15 18-6-6 6-6" />
             </svg>
@@ -130,7 +127,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
             className={`nav-link${activeNav === item ? " active" : ""}`}
             onClick={() => {
               setActiveNav(item);
-              if (item === "Home") { onGoHome ? onGoHome() : navigate("/Map"); }
+              if (item === "Home") { onGoHome ? onGoHome() : navigate("/"); }
               if (item === "Products") navigate("/Products");
               if (item === "About Us") navigate("/AboutUs");
             }}
