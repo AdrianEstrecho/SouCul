@@ -8,11 +8,11 @@ import cloud2 from "../assets/3 1.png";
 import cloud3 from "../assets/3A.png";
 import cloud4 from "../assets/4A.png";
 
-import viganImg from "../assets/vigan.png";
-import boholImg from "../assets/bohol.png";
-import boracayImg from "../assets/boracay.png";
-import tagaytayImg from "../assets/tagaytay.png";
-import baguioImg from "../assets/baguio.png";
+import viganImg from "../assets/vigan.jpg";
+import boholImg from "../assets/bohol.jpg";
+import boracayImg from "../assets/boracay.jpg";
+import tagaytayImg from "../assets/tagaytay.jpeg";
+import baguioImg from "../assets/baguio.jpg";
 import handwovenImg from "../assets/handwovenbaskets.png";
 import burnayImg from "../assets/burnaypottery.jpg";
 import kalesaImg from "../assets/kalesa.jpg";
@@ -74,7 +74,7 @@ export default function LandingPage({ cartCount }) {
           <p className="explore-subtitle">
             The Philippines is rich in diverse cultures, traditions, and languages.
           </p>
-          <button className="btn-explore" onClick={() => navigate("/Clothes")}>Explore</button>
+          <button className="btn-explore" onClick={() => navigate("/Map")}>Explore</button>
         </div>
 
         {/* Image carousel */}
@@ -82,7 +82,9 @@ export default function LandingPage({ cartCount }) {
           <div className="carousel-track">
             {doubledImages.map((img, i) => (
               <div className="carousel-card" key={i}>
-                <img src={img} alt="" className="carousel-img" />
+                <div className="carousel-img-inner">
+                  <img src={img} alt="" className="carousel-img" />
+                </div>
               </div>
             ))}
           </div>
