@@ -457,20 +457,25 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         .hero-btn:active { transform: scale(0.97); }
 
         /* ── Carousel ── */
-        .pp-carousel-wrapper {
-          width: 100vw;
-          overflow: hidden;
+        .pp-carousel-section {
           position: relative;
-          left: 50%;
-          transform: translateX(-14%);
+          z-index: 10;
+          width: 100%;
+          overflow: hidden;
+          padding: 0 0 48px;
+        }
+
+        .pp-carousel-wrapper {
+          width: 100%;
+          overflow: hidden;
         }
 
         .pp-carousel-track {
           display: flex;
           gap: 24px;
           width: max-content;
+          padding: 8px 24px;
           animation: ppCarouselScroll 25s linear infinite;
-          transform: translateX(-10%);
         }
 
         .pp-carousel-track:hover {
@@ -487,8 +492,8 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         }
 
         @keyframes ppCarouselScroll {
-          0%   { transform: translateX(-10%); }
-          100% { transform: translateX(-60%); }
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
 
         /* ── Featured Card ── */
@@ -608,9 +613,11 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
             <h1 className="hero-h1">Explore different</h1>
             <h2 className="hero-h2"><span>Products</span> in philippines</h2>
             <p className="hero-p">The Philippines is rich in diverse cultures, traditions, and languages.</p>
-            <button className="hero-btn">Explore</button>
+            <button className="hero-btn" onClick={() => navigate("/Map")}>Explore</button>
           </div>
+        </div>
 
+        <div className="pp-carousel-section">
           <FeaturedCarousel products={featuredProducts} onSelect={setSelectedProduct} />
         </div>
       </section>
