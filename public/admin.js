@@ -440,8 +440,6 @@ function clearProductImage() {
   document.getElementById("img-upload-preview").style.display = "none";
 }
 
-function goToPage_products(p) { pageState.products = p; renderProducts(); }
-
 function handleImgUpload(input) {
   const file = input.files[0];
   if (!file) return;
