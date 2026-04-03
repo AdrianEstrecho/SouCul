@@ -22,6 +22,30 @@ let productFilter = "all";
 let orderFilter = "all";
 let auditFilter = "all";
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const paginationState = {
+  products: 1,
+  users: 1,
+  orders: 1,
+  vouchers: 1,
+  admins: 1,
+  audit: 1,
+  "arch-products": 1,
+  "arch-users": 1,
+  "arch-orders": 1,
+};
+const pageSizeState = {
+  products: 10,
+  users: 10,
+  orders: 10,
+  vouchers: 10,
+  admins: 10,
+  audit: 10,
+  "arch-products": 10,
+  "arch-users": 10,
+  "arch-orders": 10,
+};
+
 const PROVINCES = ["Vigan", "Baguio", "Tagaytay", "Bohol", "Boracay"];
 const SUBCATS = ["Clothes", "Handicrafts", "Delicacies", "Decorations", "Homeware"];
 const ORDER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
@@ -74,6 +98,119 @@ function getStatusBadge(status) {
     cancelled: "badge-cancelled",
   };
   return `<span class="badge ${badgeMap[s] || "badge-inactive"}">${escapeHtml(toTitleCase(s))}</span>`;
+}
+
+function resetPaginationPage(key) {
+  if (Object.prototype.hasOwnProperty.call(paginationState, key)) {
+    paginationState[key] = 1;
+  }
+}
+
+function getPageSize(key) {
+  const configured = Number(pageSizeState[key] || PAGE_SIZE_OPTIONS[0]);
+  return PAGE_SIZE_OPTIONS.includes(configured) ? configured : PAGE_SIZE_OPTIONS[0];
+}
+
+function paginateRows(key, rows) {
+  const pageSize = getPageSize(key);
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  let page = paginationState[key] || 1;
+
+  if (page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+  paginationState[key] = page;
+
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, total);
+
+  return {
+    items: rows.slice(startIndex, endIndex),
+    total,
+    page,
+    totalPages,
+    start: total ? startIndex + 1 : 0,
+    end: endIndex,
+  };
+}
+
+function updateTableFooter(footerId, label, meta) {
+  const el = document.getElementById(footerId);
+  if (!el) return;
+
+  if (!meta.total) {
+    el.textContent = `Showing 0 ${label}`;
+    return;
+  }
+
+  el.textContent = `Showing ${meta.start}-${meta.end} of ${meta.total} ${label}`;
+}
+
+function renderTablePagination(key, containerId, total) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const pageSize = getPageSize(key);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(Math.max(paginationState[key] || 1, 1), totalPages);
+  paginationState[key] = page;
+
+  container.style.display = "block";
+
+  const prevDisabled = page <= 1 ? "disabled" : "";
+  const nextDisabled = page >= totalPages ? "disabled" : "";
+  const optionsHtml = PAGE_SIZE_OPTIONS
+    .map(size => `<option value="${size}" ${pageSize === size ? "selected" : ""}>${size}</option>`)
+    .join("");
+
+  container.innerHTML = `
+    <div class="table-pagination-controls">
+      <div class="table-page-left">
+        <label class="table-page-size">Rows
+          <select class="table-page-select" onchange="setTablePageSize('${key}', this.value)">
+            ${optionsHtml}
+          </select>
+        </label>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="changeTablePage('${key}', -1)" ${prevDisabled}>Prev</button>
+      <span class="table-page-info">Page ${page} of ${totalPages}</span>
+      <button class="btn btn-sm btn-outline" onclick="changeTablePage('${key}', 1)" ${nextDisabled}>Next</button>
+    </div>
+  `;
+}
+
+function setTablePageSize(key, value) {
+  const nextSize = Number(value);
+  if (!PAGE_SIZE_OPTIONS.includes(nextSize)) return;
+
+  pageSizeState[key] = nextSize;
+  paginationState[key] = 1;
+
+  const activePanel = getActivePanel();
+  if (activePanel !== key) return;
+
+  const query = String(document.getElementById("global-search")?.value || "").trim();
+  if (query && ["products", "users", "orders", "vouchers", "admins", "audit"].includes(activePanel)) {
+    globalSearch(query, { preservePage: true });
+    return;
+  }
+
+  renderByPanel(activePanel);
+}
+
+function changeTablePage(key, delta) {
+  paginationState[key] = Math.max(1, (paginationState[key] || 1) + Number(delta || 0));
+
+  const activePanel = getActivePanel();
+  if (activePanel !== key) return;
+
+  const query = String(document.getElementById("global-search")?.value || "").trim();
+  if (query && ["products", "users", "orders", "vouchers", "admins", "audit"].includes(activePanel)) {
+    globalSearch(query, { preservePage: true });
+    return;
+  }
+
+  renderByPanel(activePanel);
 }
 
 function getActivePanel() {
@@ -377,6 +514,7 @@ function normalizeProduct(p) {
 
 function filterProducts(cat, el) {
   productFilter = cat;
+  resetPaginationPage("products");
   document.querySelectorAll("#product-filter-bar .filter-btn").forEach(b => b.classList.remove("active"));
   if (el) el.classList.add("active");
   renderProducts();
@@ -395,9 +533,10 @@ async function renderProducts(list) {
       data = state.products;
     }
 
+    const paged = paginateRows("products", data);
     const tbody = document.getElementById("products-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(p => `
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(p => `
       <tr>
         <td>${p.image ? `<img class="img-preview" src="${escapeHtml(p.image)}" onerror="this.style.display='none'" />` : '<div class="img-preview" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-muted)"><i class="fa-solid fa-bag-shopping"></i></div>'}</td>
         <td><div style="font-weight:500">${escapeHtml(p.name)}</div><div style="font-size:12px;color:var(--text-muted)">${escapeHtml(p.brand)}</div></td>
@@ -406,7 +545,7 @@ async function renderProducts(list) {
         <td><span class="${p.stock < 10 ? "badge badge-pending" : ""}">${p.stock}</span></td>
         <td>${toCurrency(p.price)}${p.discount > 0 ? ` <span style="font-size:11px;color:var(--accent-coral)">-${p.discount}%</span>` : ""}</td>
         <td>${getStatusBadge(p.status)}</td>
-        <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <td style="gap:6px;">
           <button class="btn btn-sm btn-outline" onclick="editProduct('${p.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="archiveProduct('${p.id}')">Archive</button>
         </td>
@@ -414,7 +553,8 @@ async function renderProducts(list) {
     `).join("")
       : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No products found</td></tr>';
 
-    document.getElementById("products-footer").textContent = `Showing ${data.length} products`;
+    updateTableFooter("products-footer", "products", paged);
+    renderTablePagination("products", "products-pagination", paged.total);
   } catch (err) {
     console.error("Products error:", err);
     showToast(err.message || "Failed to load products");
@@ -544,7 +684,7 @@ async function editProduct(id) {
 
 async function archiveProduct(id) {
   try {
-    await api.request(`/api/v1/admin/products/${id}`, { method: "DELETE" });
+    await api.archiveProduct(id);
     addNotif("Product archived");
     showToast("Product archived");
     await renderProducts();
@@ -595,9 +735,10 @@ async function renderUsers(list) {
       state.users = data;
     }
 
+    const paged = paginateRows("users", data);
     const tbody = document.getElementById("users-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(u => {
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(u => {
         const names = splitFullName(u.full_name);
         const firstName = u.first_name || names.firstName || "-";
         const lastName = u.last_name || names.lastName || "-";
@@ -608,7 +749,7 @@ async function renderUsers(list) {
           <td>${escapeHtml(censorEmail(u.email))}</td>
           <td style="font-family:monospace">••••••</td>
           <td><span class="badge badge-user">User</span></td>
-          <td style="display:flex;gap:6px;flex-wrap:wrap">
+          <td style="gap:6px;">
             <button class="btn btn-sm btn-outline" onclick="viewUserOrders('${u.id}')">Orders</button>
             <button class="btn btn-sm btn-danger" onclick="archiveUser('${u.id}')">Archive</button>
           </td>
@@ -617,7 +758,8 @@ async function renderUsers(list) {
       }).join("")
       : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No users registered</td></tr>';
 
-    document.getElementById("users-footer").textContent = `Showing ${data.length} users`;
+    updateTableFooter("users-footer", "users", paged);
+    renderTablePagination("users", "users-pagination", paged.total);
   } catch (err) {
     console.error("Users error:", err);
     showToast(err.message || "Failed to load users");
@@ -648,7 +790,7 @@ async function viewUserOrders(uid) {
 
 async function archiveUser(id) {
   try {
-    await api.request(`/api/v1/admin/users/${id}`, { method: "DELETE" });
+    await api.archiveUser(id);
     showToast("User archived");
     await renderUsers();
     await renderArchUsers();
@@ -671,6 +813,7 @@ async function toggleUser(id) {
 
 function filterOrders(status, el) {
   orderFilter = status;
+  resetPaginationPage("orders");
   document.querySelectorAll("#panel-orders .filter-btn").forEach(b => b.classList.remove("active"));
   if (el) el.classList.add("active");
   renderOrders();
@@ -714,9 +857,10 @@ async function renderOrders(list) {
       state.orders = data;
     }
 
+    const paged = paginateRows("orders", data);
     const tbody = document.getElementById("orders-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(o => {
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(o => {
         const status = String(o.status || "").toLowerCase();
         return `
         <tr>
@@ -741,7 +885,8 @@ async function renderOrders(list) {
       }).join("")
       : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No orders found</td></tr>';
 
-    document.getElementById("orders-footer").textContent = `Showing ${data.length} orders`;
+    updateTableFooter("orders-footer", "orders", paged);
+    renderTablePagination("orders", "orders-pagination", paged.total);
   } catch (err) {
     console.error("Orders error:", err);
     showToast(err.message || "Failed to load orders");
@@ -806,7 +951,7 @@ async function updateOrderStatus() {
 
 async function archiveOrder(id) {
   try {
-    await api.request(`/api/v1/admin/orders/${id}`, { method: "DELETE" });
+    await api.archiveOrder(id);
     showToast("Order archived");
     await renderOrders();
     await renderArchOrders();
@@ -840,9 +985,10 @@ async function renderVouchers(list) {
       state.vouchers = data;
     }
 
+    const paged = paginateRows("vouchers", data);
     const tbody = document.getElementById("vouchers-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(v => `
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(v => `
       <tr>
         <td><span class="voucher-code">${escapeHtml(v.code)}</span></td>
         <td>${escapeHtml(mapVoucherTypeLabel(v.discount_type))}</td>
@@ -859,7 +1005,8 @@ async function renderVouchers(list) {
     `).join("")
       : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No vouchers</td></tr>';
 
-    document.getElementById("vouchers-footer").textContent = `Showing ${data.length} vouchers`;
+    updateTableFooter("vouchers-footer", "vouchers", paged);
+    renderTablePagination("vouchers", "vouchers-pagination", paged.total);
   } catch (err) {
     console.error("Vouchers error:", err);
     showToast(err.message || "Failed to load vouchers");
@@ -969,9 +1116,10 @@ async function renderAdmins(list) {
     }
 
     const meId = String(state.admin?.id || api.getStoredAdmin()?.id || "");
+    const paged = paginateRows("admins", data);
     const tbody = document.getElementById("admins-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(a => {
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(a => {
         const nameParts = splitFullName(a.full_name);
         const username = (a.email || "").split("@")[0] || "admin";
         return `
@@ -987,7 +1135,8 @@ async function renderAdmins(list) {
       }).join("")
       : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No admins found</td></tr>';
 
-    document.getElementById("admins-footer").textContent = `Showing ${data.length} admins`;
+    updateTableFooter("admins-footer", "admins", paged);
+    renderTablePagination("admins", "admins-pagination", paged.total);
   } catch (err) {
     console.error("Admins error:", err);
     showToast(err.message || "Failed to load admins");
@@ -1041,6 +1190,7 @@ async function deleteAdmin(id) {
 
 function filterAudit(action, el) {
   auditFilter = action;
+  resetPaginationPage("audit");
   document.querySelectorAll("#panel-audit .filter-btn").forEach(b => b.classList.remove("active"));
   if (el) el.classList.add("active");
   renderAudit();
@@ -1067,9 +1217,10 @@ async function renderAudit(list) {
       Unarchive: "audit-archive",
     };
 
+    const paged = paginateRows("audit", data);
     const tbody = document.getElementById("audit-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(a => `
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(a => `
       <tr>
         <td style="font-size:12px;color:var(--text-muted)">${escapeHtml(a.created_at || "")}</td>
         <td><span class="audit-action-badge ${classes[a.action] || ""}">${escapeHtml(a.action || "-")}</span></td>
@@ -1080,7 +1231,8 @@ async function renderAudit(list) {
     `).join("")
       : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No logs</td></tr>';
 
-    document.getElementById("audit-footer").textContent = `Showing ${data.length} logs`;
+    updateTableFooter("audit-footer", "logs", paged);
+    renderTablePagination("audit", "audit-pagination", paged.total);
   } catch (err) {
     console.error("Audit error:", err);
     showToast(err.message || "Failed to load audit logs");
@@ -1096,10 +1248,14 @@ async function renderArchProducts(list) {
       state.archivedProducts = data;
     }
 
+    const paged = paginateRows("arch-products", data);
     const tbody = document.getElementById("arch-products-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(p => `<tr><td>${p.image ? `<img class="img-preview" src="${escapeHtml(p.image)}" onerror="this.style.display='none'" />` : '<div class="img-preview" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-muted)"><i class="fa-solid fa-bag-shopping"></i></div>'}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.stock)}</td><td><button class="btn btn-sm btn-teal" onclick="restoreProduct('${p.id}')">Restore</button></td></tr>`).join("")
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(p => `<tr><td>${p.image ? `<img class="img-preview" src="${escapeHtml(p.image)}" onerror="this.style.display='none'" />` : '<div class="img-preview" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-muted)"><i class="fa-solid fa-bag-shopping"></i></div>'}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.stock)}</td><td><button class="btn btn-sm btn-teal" onclick="restoreProduct('${p.id}')">Restore</button></td></tr>`).join("")
       : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No archived products</td></tr>';
+
+    updateTableFooter("arch-products-footer", "archived products", paged);
+    renderTablePagination("arch-products", "arch-products-pagination", paged.total);
   } catch (err) {
     console.error("Archived products error:", err);
     showToast(err.message || "Failed to load archived products");
@@ -1128,13 +1284,17 @@ async function renderArchUsers(list) {
       state.archivedUsers = data;
     }
 
+    const paged = paginateRows("arch-users", data);
     const tbody = document.getElementById("arch-users-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(u => {
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(u => {
         const username = (u.email || "").split("@")[0] || u.full_name || "user";
         return `<tr><td>${escapeHtml(username)}</td><td>${escapeHtml(censorEmail(u.email))}</td><td>User</td><td><button class="btn btn-sm btn-teal" onclick="restoreUser('${u.id}')">Restore</button></td></tr>`;
       }).join("")
       : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">No archived users</td></tr>';
+
+    updateTableFooter("arch-users-footer", "archived users", paged);
+    renderTablePagination("arch-users", "arch-users-pagination", paged.total);
   } catch (err) {
     console.error("Archived users error:", err);
     showToast(err.message || "Failed to load archived users");
@@ -1163,10 +1323,14 @@ async function renderArchOrders(list) {
       state.archivedOrders = data;
     }
 
+    const paged = paginateRows("arch-orders", data);
     const tbody = document.getElementById("arch-orders-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(o => `<tr><td>${escapeHtml(o.order_number || o.id)}</td><td>${escapeHtml(censorName(o.customer))}</td><td>${toCurrency(o.total_amount || 0)}</td><td>${getStatusBadge(o.status)}</td><td>${escapeHtml(o.archived_at || "")}</td><td><button class="btn btn-sm btn-teal" onclick="restoreOrder('${o.id}')">Restore</button></td></tr>`).join("")
+    tbody.innerHTML = paged.items.length
+      ? paged.items.map(o => `<tr><td>${escapeHtml(o.order_number || o.id)}</td><td>${escapeHtml(censorName(o.customer))}</td><td>${toCurrency(o.total_amount || 0)}</td><td>${getStatusBadge(o.status)}</td><td>${escapeHtml(o.archived_at || "")}</td><td><button class="btn btn-sm btn-teal" onclick="restoreOrder('${o.id}')">Restore</button></td></tr>`).join("")
       : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No archived orders</td></tr>';
+
+    updateTableFooter("arch-orders-footer", "archived orders", paged);
+    renderTablePagination("arch-orders", "arch-orders-pagination", paged.total);
   } catch (err) {
     console.error("Archived orders error:", err);
     showToast(err.message || "Failed to load archived orders");
@@ -1272,14 +1436,18 @@ function updateSidebarAdmin() {
   if (roleEl) roleEl.textContent = role;
 }
 
-function globalSearch(q) {
+function globalSearch(q, options = {}) {
+  const preservePage = !!options.preservePage;
   const query = String(q || "").toLowerCase().trim();
   const panel = getActivePanel();
 
   if (!query) {
+    if (!preservePage) resetPaginationPage(panel);
     renderByPanel(panel);
     return;
   }
+
+  if (!preservePage) resetPaginationPage(panel);
 
   if (panel === "products") {
     const data = state.products.filter(p => `${p.name} ${p.category} ${p.subcategory} ${p.brand}`.toLowerCase().includes(query));

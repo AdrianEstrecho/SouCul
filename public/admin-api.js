@@ -1,5 +1,6 @@
 // Admin API Service Layer
 // Connects the frontend admin panel to the PHP backend API
+// Keep this class aligned with active calls from public/admin.js.
 
 const isLocalVitePort =
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
@@ -16,7 +17,8 @@ class AdminAPI {
     this.token = localStorage.getItem('admin_token') || null;
   }
 
-  // Helper method to make authenticated requests
+  // Helper for authenticated requests.
+  // Expected success shape from backend: { success: true, data: ... }.
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const headers = {
@@ -34,13 +36,16 @@ class AdminAPI {
         headers
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json')
+        ? await response.json()
+        : null;
 
       if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+        throw new Error((data && data.message) || `API request failed (${response.status})`);
       }
 
-      return data;
+      return data || { success: true, data: null };
     } catch (error) {
       console.error('API Error:', error);
       throw error;
@@ -100,13 +105,6 @@ class AdminAPI {
     });
   }
 
-  async updateProductInventory(productId, quantity) {
-    return await this.request(`/api/v1/admin/products/${productId}/inventory`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity_in_stock: quantity })
-    });
-  }
-
   // Orders
   async getOrders(params = {}) {
     const queryString = new URLSearchParams(params).toString();
@@ -160,18 +158,11 @@ class AdminAPI {
     });
   }
 
-  // Health check
-  async healthCheck() {
-    return await this.request('/health', { skipAuth: true });
-  }
+  // Vouchers
   async getVouchers(params = {}) {
     const queryString = new URLSearchParams(params).toString();
     const endpoint = `/api/v1/admin/vouchers${queryString ? '?' + queryString : ''}`;
     return await this.request(endpoint);
-  }
-
-  async getVoucherDetails(voucherId) {
-    return await this.request(`/api/v1/admin/vouchers/${voucherId}`);
   }
 
   async createVoucher(voucherData) {
@@ -194,9 +185,21 @@ class AdminAPI {
     });
   }
 
-  async toggleVoucherStatus(voucherId) {
-    return await this.request(`/api/v1/admin/vouchers/${voucherId}/toggle`, {
-      method: 'PATCH'
+  async archiveProduct(productId) {
+    return await this.request(`/api/v1/admin/products/${productId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async archiveUser(userId) {
+    return await this.request(`/api/v1/admin/users/${userId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async archiveOrder(orderId) {
+    return await this.request(`/api/v1/admin/orders/${orderId}`, {
+      method: 'DELETE'
     });
   }
 
@@ -214,12 +217,6 @@ class AdminAPI {
     });
   }
 
-  async permanentlyDeleteProduct(productId) {
-    return await this.request(`/api/v1/admin/archive/products/${productId}`, {
-      method: 'DELETE'
-    });
-  }
-
   // ── ARCHIVED USERS ───────────────────────────────────
 
   async getArchivedUsers(params = {}) {
@@ -231,12 +228,6 @@ class AdminAPI {
   async restoreArchivedUser(userId) {
     return await this.request(`/api/v1/admin/archive/users/${userId}/restore`, {
       method: 'PATCH'
-    });
-  }
-
-  async permanentlyDeleteUser(userId) {
-    return await this.request(`/api/v1/admin/archive/users/${userId}`, {
-      method: 'DELETE'
     });
   }
 
@@ -254,25 +245,12 @@ class AdminAPI {
     });
   }
 
-  async permanentlyDeleteOrder(orderId) {
-    return await this.request(`/api/v1/admin/archive/orders/${orderId}`, {
-      method: 'DELETE'
-    });
-  }
-
   // ── AUDIT TRAIL ──────────────────────────────────────
 
   async getAuditLogs(params = {}) {
     // Supported params: action, entity, admin_id, date_from, date_to, page, limit
     const queryString = new URLSearchParams(params).toString();
     const endpoint = `/api/v1/admin/audit${queryString ? '?' + queryString : ''}`;
-    return await this.request(endpoint);
-  }
-
-  async exportAuditLogs(params = {}) {
-    // Returns a downloadable CSV/JSON export of audit logs
-    const queryString = new URLSearchParams({ ...params, export: 'csv' }).toString();
-    const endpoint = `/api/v1/admin/audit/export?${queryString}`;
     return await this.request(endpoint);
   }
 
@@ -294,31 +272,10 @@ class AdminAPI {
     });
   }
 
-  async getActiveSessions() {
-    return await this.request('/api/v1/admin/profile/sessions');
-  }
-
   async revokeAllSessions() {
     return await this.request('/api/v1/admin/profile/sessions', {
       method: 'DELETE'
     });
-  }
-
-  // ── DASHBOARD EXTRAS ─────────────────────────────────
-
-  async getSalesAnalytics(params = {}) {
-    // params: { period: 'daily' | 'weekly' | 'monthly', date_from, date_to }
-    const queryString = new URLSearchParams(params).toString();
-    const endpoint = `/api/v1/admin/dashboard/analytics${queryString ? '?' + queryString : ''}`;
-    return await this.request(endpoint);
-  }
-
-  async getTopProducts(limit = 5) {
-    return await this.request(`/api/v1/admin/dashboard/top-products?limit=${limit}`);
-  }
-
-  async getLowStockAlerts(threshold = 10) {
-    return await this.request(`/api/v1/admin/dashboard/low-stock?threshold=${threshold}`);
   }
 
   // ── UTILITY HELPERS ──────────────────────────────────
@@ -336,13 +293,4 @@ class AdminAPI {
     }
   }
 
-  setBaseURL(url) {
-    this.baseURL = url;
-  }
-
 }
-
-
-
-// Create and export a singleton instance
-// const adminAPI = new AdminAPI();

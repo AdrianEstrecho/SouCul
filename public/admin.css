@@ -319,6 +319,52 @@ th { padding:13px 16px; text-align:left; font-size:10.5px; text-transform:upperc
 td { padding:14px 16px; border-top:1px solid rgba(255,255,255,0.035); vertical-align:middle; }
 tr:hover td { background:rgba(77,200,222,0.05); }
 .table-footer { padding:11px 16px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border); }
+.table-pagination {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border);
+}
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.table-page-left {
+  margin-right: auto;
+}
+.table-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.table-page-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-main);
+  font-size: 12px;
+  outline: none;
+}
+.table-page-select:focus {
+  border-color: var(--sea-foam);
+}
+.table-page-select option {
+  background: var(--sea-mid);
+}
+.table-page-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 92px;
+  text-align: center;
+}
+.table-pagination .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* BADGES */
 .badge {
