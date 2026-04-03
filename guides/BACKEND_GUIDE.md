@@ -1,4 +1,4 @@
-# SoulCul Backend Development Guide
+# soucul Backend Development Guide
 
 Complete sequential guide from setup to API deployment. Follow in order.
 
@@ -62,7 +62,7 @@ composer require vlucas/phpdotenv nikic/fast-route monolog/monolog
 Create `.env.example`:
 
 ```env
-APP_NAME=SoulCul API
+APP_NAME=SouCul API
 APP_ENV=local
 APP_DEBUG=true
 APP_URL=http://localhost:8000
@@ -70,8 +70,8 @@ APP_URL=http://localhost:8000
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=soulcul
-DB_USERNAME=soulcul_user
+DB_DATABASE=soucul
+DB_USERNAME=soucul_dev
 DB_PASSWORD=your_secure_password
 
 JWT_SECRET=your_jwt_secret_key_here
@@ -88,11 +88,11 @@ Copy to `.env` and customize values. **Never commit .env to git.**
 Connect to MySQL and run:
 
 ```sql
-CREATE DATABASE IF NOT EXISTS soulcul CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE soulcul;
+CREATE DATABASE IF NOT EXISTS soucul CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE soucul;
 
-CREATE USER 'soulcul_user'@'localhost' IDENTIFIED BY 'your_secure_password';
-GRANT ALL PRIVILEGES ON soulcul.* TO 'soulcul_user'@'localhost';
+CREATE USER 'soucul_dev'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON soucul.* TO 'soucul_dev'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
@@ -281,14 +281,123 @@ INSERT INTO categories (name, slug, display_order, is_active) VALUES
 ('Homeware', 'homeware', 5, true);
 ```
 
-### 2.4 Backup & Restore
+### 2.4 Testing Database Connection
+
+After setting up your database and environment variables, verify the connection using the provided test scripts.
+
+#### Option 1: Test with Environment Variables (`test-db-connection.js`)
+
+This script uses the credentials from your `.env` file:
+
+```powershell
+node test-db-connection.js
+```
+
+**What it does:**
+- Loads configuration from `.env` file
+- Attempts to connect to the database using configured credentials
+- Lists all tables in the database
+- Displays success/failure status with detailed error messages
+
+**Expected Output:**
+```
+Testing database connection...
+Configuration:
+  Host: 127.0.0.1
+  Port: 3307
+  Database: soucul
+  Username: soucul_dev
+
+✓ Connection successful!
+
+✓ Found 11 table(s) in database "soucul":
+  - users
+  - admins
+  - locations
+  - categories
+  - products
+  - product_images
+  - cart_items
+  - orders
+  - order_items
+  - payments
+
+✓ Connection closed successfully
+```
+
+#### Option 2: Diagnose Setup Issues (`diagnose-db.js`)
+
+If you're having connection problems, use this diagnostic script:
+
+```powershell
+node diagnose-db.js
+```
+
+**What it does:**
+- Connects using XAMPP default root credentials (no password)
+- Lists all available databases
+- Checks if the `soucul` database exists
+- Verifies if the `soucul_dev` user exists
+- Provides SQL commands to create missing components
+
+**When to use:**
+- First-time setup
+- Connection errors with `test-db-connection.js`
+- Verifying XAMPP MySQL is running
+- Checking if database/user creation is needed
+
+**Sample Output (when setup incomplete):**
+```
+Testing connection with XAMPP default root user...
+✓ Connection with root successful!
+
+✓ Available databases:
+  - information_schema
+  - mysql
+  - performance_schema
+  - phpmyadmin
+
+✗ Database "soucul" does NOT exist yet!
+  You need to create it in phpMyAdmin first.
+
+✗ User "soucul_dev" does NOT exist!
+
+You need to create this user. Here's the SQL to run in phpMyAdmin:
+
+--- Copy and run these SQL commands in phpMyAdmin ---
+CREATE USER 'soucul_dev'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON soucul.* TO 'soucul_dev'@'localhost';
+FLUSH PRIVILEGES;
+--- End of SQL commands ---
+```
+
+#### Quick Start Batch Script (Windows)
+
+For convenience, you can use:
+
+```powershell
+.\run-db-test.bat
+```
+
+This runs the environment-based connection test.
+
+#### Troubleshooting Connection Issues
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `ECONNREFUSED` | MySQL not running | Start XAMPP MySQL service |
+| `ER_ACCESS_DENIED_ERROR` | Wrong credentials | Verify `.env` credentials match database user |
+| `ER_BAD_DB_ERROR` | Database doesn't exist | Run diagnostic script and create database |
+| Port error | Wrong port number | Check XAMPP MySQL port (usually 3306 or 3307) |
+
+### 2.5 Backup & Restore
 
 ```bash
 # Backup
-mysqldump -u soulcul_user -p soulcul > soulcul_backup_$(date +%Y%m%d).sql
+mysqldump -u soucul_user -p soucul > soucul_backup_$(date +%Y%m%d).sql
 
 # Restore
-mysql -u soulcul_user -p soulcul < soulcul_backup_20260331.sql
+mysql -u soucul_user -p soucul < soucul_backup_20260331.sql
 ```
 
 ---

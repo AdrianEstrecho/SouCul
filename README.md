@@ -1,26 +1,116 @@
-# React + Vite
+# SouCul - Regional Filipino Souvenirs E-commerce
 
-## Backend Developer Setup (PHP + MySQL)
+A full-stack e-commerce platform showcasing Filipino regional products and delicacies.
 
-For backend onboarding and local environment setup, see:
+## 🏗️ Project Structure
 
-- [BACKEND_SETUP_GUIDE.md](./guides/BACKEND_SETUP_GUIDE.md)
+```
+SouCul/
+├── src/                  # Frontend React components
+├── public/               # Frontend static assets
+├── index.html            # Frontend entry point
+├── package.json          # Frontend dependencies
+├── vite.config.js        # Vite configuration
+├── backend/              # PHP REST API
+│   ├── public/           # API entry point
+│   ├── src/              # Application code
+│   └── composer.json     # Backend dependencies
+├── scripts/              # Utility scripts
+│   ├── test-db-connection.js
+│   └── diagnose-db.js
+├── guides/               # Documentation
+│   └── BACKEND_GUIDE.md  # Complete backend setup
+└── .env                  # Database configuration
+```
 
-For shared API standards between customer and admin/backend tracks, see:
+**Note:** Frontend stays in root for easy Vercel deployment. Backend has its own folder.
 
-- [API_CONTRACT.md](./guides/API_CONTRACT.md)
+## 🚀 Quick Start
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+### First Time Setup
 
-Currently, two official plugins are available:
+```bash
+# 1. Create backend folder structure
+.\restructure.bat
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+# 2. Set up backend configuration files
+.\setup-backend.bat
 
-## React Compiler
+# 3. Clean up root folder (optional)
+.\cleanup-root.bat
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Frontend Setup (React + Vite)
 
-## Expanding the ESLint configuration
+Frontend files are in the root directory.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+Access at: `http://localhost:5173`
+
+### Backend Setup (PHP + MySQL)
+
+```bash
+cd backend
+composer install
+copy .env.example .env
+# Edit .env with your database credentials
+php -S localhost:8000 -t public
+```
+
+Access at: `http://localhost:8000`
+
+**Complete backend setup guide:** [guides/BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md)
+
+## 🗄️ Database Setup
+
+1. **Start XAMPP MySQL** (port 3307 or 3306)
+
+2. **Test connection:**
+   ```bash
+   node scripts/test-db-connection.js
+   ```
+
+3. **Diagnose issues:**
+   ```bash
+   node scripts/diagnose-db.js
+   ```
+
+See [BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md) for detailed database setup instructions.
+
+## 📚 Documentation
+
+- **[BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md)** - Complete backend development guide
+  - Environment setup
+  - Database schema
+  - API contract
+  - Testing & deployment
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- React 19
+- Vite 8
+- React Router DOM
+
+**Backend:**
+- PHP 8.2+
+- MySQL 8.0+
+- Composer
+
+**Deployment:**
+- Frontend: Vercel
+- Backend: Hostinger
+
+## 👥 Team
+
+- Frontend Developer
+- Backend Developer (Customer API)
+- Backend Developer (Admin API)
+
+## 📝 License
+
+Proprietary - SouCul Team
