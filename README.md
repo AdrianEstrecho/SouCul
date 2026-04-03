@@ -6,21 +6,50 @@ A full-stack e-commerce platform showcasing Filipino regional products and delic
 
 ```
 SouCul/
-├── src/                  # Frontend React components
-├── public/               # Frontend static assets
-├── index.html            # Frontend entry point
-├── package.json          # Frontend dependencies
-├── vite.config.js        # Vite configuration
-├── backend/              # PHP REST API
-│   ├── public/           # API entry point
-│   ├── src/              # Application code
-│   └── composer.json     # Backend dependencies
-├── scripts/              # Utility scripts
+├── src/                       # Frontend React application
+│   ├── Components/           # Reusable React components
+│   │   ├── AboutUs.jsx
+│   │   ├── Categories.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Hero.jsx
+│   │   ├── HomePin.jsx
+│   │   ├── LandingPage.jsx
+│   │   ├── Navbar.jsx
+│   │   └── Products.jsx
+│   ├── StyleSheet/          # Component-specific styles
+│   ├── assets/              # Images and media files
+│   ├── Baguio/              # Region-specific pages
+│   ├── Bohol/
+│   ├── Boracay/
+│   ├── Tagaytay/
+│   ├── Vigan/
+│   ├── Cart.jsx             # Shopping cart page
+│   ├── Checkout.jsx         # Checkout page
+│   ├── Login.jsx            # Authentication page
+│   ├── ProductPage.jsx      # Product details page
+│   ├── Profile.jsx          # User profile page
+│   ├── SoulCul.jsx          # Main app component
+│   ├── main.jsx             # React entry point
+│   └── index.css            # Global styles
+├── public/                   # Static assets
+│   ├── assets/              # Public images
+│   ├── admin.html           # Admin panel
+│   ├── admin.js             # Admin functionality
+│   └── admin.css            # Admin styles
+├── backend/                  # PHP REST API (to be implemented)
+├── scripts/                  # Development utilities
 │   ├── test-db-connection.js
-│   └── diagnose-db.js
-├── guides/               # Documentation
-│   └── BACKEND_GUIDE.md  # Complete backend setup
-└── .env                  # Database configuration
+│   ├── diagnose-db.js
+│   ├── run-db-test.bat
+│   ├── setup-backend.bat
+│   └── README.md
+├── guides/                   # Documentation
+│   └── BACKEND_GUIDE.md     # Complete backend setup
+├── index.html               # Frontend entry point
+├── package.json             # Frontend dependencies
+├── eslint.config.js         # ESLint configuration
+├── vite.config.js           # Vite configuration
+└── .env                     # Database configuration
 ```
 
 **Note:** Frontend stays in root for easy Vercel deployment. Backend has its own folder.
@@ -104,9 +133,9 @@ See [BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md) for detailed database setup in
 
 ## 👥 Team
 
-- Frontend Developer
-- Backend Developer (Customer API)
-- Backend Developer (Admin API)
+- Frontend Developers | @AdrianEstrecho & @yashiro-nyx
+- Backend Developer (Customer API) | @RubinusSorro
+- Backend Developer (Admin API) | @Vaelarr
 
 ## 📝 License
 
