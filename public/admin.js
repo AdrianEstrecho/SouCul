@@ -1,3 +1,46 @@
+//  PAGINATION
+const PAGE_SIZE = 10;
+const pageState = {
+  products:1, users:1, orders:1, vouchers:1, admins:1,
+  audit:1, 'arch-products':1, 'arch-users':1, 'arch-orders':1,
+};
+function paginate(data, page, perPage=PAGE_SIZE) {
+  const total=data.length, totalPages=Math.max(1,Math.ceil(total/perPage));
+  const safePage=Math.min(Math.max(1,page),totalPages);
+  return { items:data.slice((safePage-1)*perPage, safePage*perPage), total, totalPages, currentPage:safePage };
+}
+function renderPagination(containerId, total, currentPage, totalPages, onPageFn) {
+  const el = document.getElementById(containerId); if (!el) return;
+  if (totalPages <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+
+  const btn = (label, page, disabled, active) =>
+    `<button class="pg-btn${active ? ' pg-active' : ''}${disabled ? ' pg-disabled' : ''}" ${disabled ? 'disabled' : ''} ${(!disabled && !active) ? `onclick="(${onPageFn})(${page})"` : ''} >${label}</button>`;
+  const ell = () => `<span class="pg-ellipsis">\u2026</span>`;
+
+  // Always exactly 7 slots — no placeholders, no ghosts, no variable-length arrays.
+  let slots;
+  if (totalPages <= 7) {
+    slots = Array.from({length: totalPages}, (_, i) => i + 1);
+    while (slots.length < 7) slots.push('_'); // pad with dummy that renders as ellipsis-sized gap
+  } else if (currentPage <= 4) {
+    slots = [1, 2, 3, 4, 5, '...', totalPages];
+  } else if (currentPage >= totalPages - 3) {
+    slots = [1, '...', totalPages-4, totalPages-3, totalPages-2, totalPages-1, totalPages];
+  } else {
+    slots = [1, '...', currentPage-1, currentPage, currentPage+1, '...', totalPages];
+  }
+
+  el.innerHTML =
+    btn('\u2039', currentPage - 1, currentPage === 1, false) +
+    slots.map(p => {
+      if (p === '_')   return `<span class="pg-ellipsis" style="visibility:hidden">\u2026</span>`;
+      if (p === '...') return ell();
+      return btn(p, p, false, p === currentPage);
+    }).join('') +
+    btn('\u203a', currentPage + 1, currentPage === totalPages, false);
+}
+
 //  STATE
 let state = {
   admin: { id:'ADM-001', username:'admin', email:'admin@soucul.com', fname:'Super', lname:'Admin', role:'Super Admin', password:'admin123', since: new Date().toLocaleDateString() },
@@ -314,33 +357,46 @@ function renderDashboard() {
   document.getElementById('stat-users').textContent = state.users.length;
   document.getElementById('stat-lowstock').textContent = lowStock;
 
-  // categories
+  // categories — bar chart style
   const cats = {};
   state.products.forEach(p => { cats[p.category] = (cats[p.category]||0)+1; });
-  document.getElementById('cat-breakdown').innerHTML = Object.entries(cats).map(([k,v])=>
-    `<div class="cat-row"><span class="cat-name">${k}</span><span class="cat-count">${v}</span></div>`
-  ).join('') || '<div style="color:var(--text-muted);font-size:13px">No products</div>';
+  const catEntries = Object.entries(cats);
+  const maxCat = catEntries.length ? Math.max(...catEntries.map(([,v])=>v)) : 1;
+  document.getElementById('cat-breakdown').innerHTML = catEntries.map(([k,v])=>`
+    <div class="cat-row">
+      <div class="cat-row-top"><span class="cat-name">${k}</span><span class="cat-count">${v}</span></div>
+      <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(v/maxCat*100)}%"></div></div>
+    </div>`
+  ).join('') || '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">No products</div>';
 
-  // order statuses
+  // order statuses — bar chart style
+  const statusColors = { Pending:'#fbbf24', Processing:'#c4b5fd', Shipped:'#63b3ed', Completed:'#4ade80', Cancelled:'var(--accent-coral)' };
   const statuses = ['Pending','Processing','Shipped','Completed','Cancelled'];
-  document.getElementById('order-status-breakdown').innerHTML = statuses.map(s=>{
-    const c = state.orders.filter(o=>o.status===s).length;
-    return `<div class="ost"><div class="ost-val">${c}</div><div class="ost-lbl">${s}</div></div>`;
-  }).join('');
+  const counts = statuses.map(s => state.orders.filter(o=>o.status===s).length);
+  const maxOrd = Math.max(...counts, 1);
+  document.getElementById('order-status-breakdown').innerHTML = statuses.map((s,i)=>`
+    <div class="ost-row">
+      <div class="ost-row-top">
+        <span class="ost-lbl"><span class="ost-dot" style="background:${statusColors[s]}"></span>${s}</span>
+        <span class="ost-val" style="color:${statusColors[s]}">${counts[i]}</span>
+      </div>
+      <div class="ost-bar-track"><div class="ost-bar-fill" style="width:${Math.round(counts[i]/maxOrd*100)}%;background:${statusColors[s]}"></div></div>
+    </div>`
+  ).join('');
 
   // top selling
   const sold = {};
   state.orders.forEach(o => o.items.forEach(i => { sold[i.name]=(sold[i.name]||0)+i.qty; }));
   const sorted = Object.entries(sold).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('top-selling').innerHTML = sorted.length ? sorted.map(([n,c],i)=>
-    `<tr><td>${i+1}</td><td>${n}</td><td>${c}</td></tr>`
-  ).join('') : '<tr><td colspan="3" style="color:var(--text-muted)">No sales data</td></tr>';
+    `<tr><td><span style="font-weight:700;color:var(--sea-foam)">${i+1}</span></td><td>${n}</td><td style="color:var(--accent-gold);font-weight:600">${c} sold</td></tr>`
+  ).join('') : '<tr><td colspan="3" style="color:var(--text-muted);padding:16px 0">No sales data</td></tr>';
 
   // inv alerts
   const alerts = state.products.filter(p=>p.stock<10);
   document.getElementById('inv-alerts').innerHTML = alerts.length ? alerts.map(p=>
     `<tr><td>${p.name}</td><td>${p.stock}</td><td><span class="badge ${p.stock===0?'badge-cancelled':'badge-pending'}">${p.stock===0?'Out of Stock':'Low'}</span></td></tr>`
-  ).join('') : '<tr><td colspan="3" style="color:var(--text-muted)">All stock levels healthy</td></tr>';
+  ).join('') : '<tr><td colspan="3" style="color:var(--text-muted);padding:16px 0">All stock levels healthy</td></tr>';
 
   // activity
   document.getElementById('activity-log').innerHTML = state.audit.slice(-8).reverse().map(a=>
@@ -351,7 +407,7 @@ function renderDashboard() {
 //  PRODUCTS
 let productFilter = 'all';
 function filterProducts(cat, el) {
-  productFilter = cat;
+  productFilter = cat; pageState.products = 1;
   document.querySelectorAll('#product-filter-bar .filter-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   renderProducts();
@@ -359,14 +415,15 @@ function filterProducts(cat, el) {
 const PROVINCES = ['Vigan','Baguio','Tagaytay','Bohol','Boracay'];
 const SUBCATS   = ['Clothes','Handicrafts','Delicacies','Decorations','Homeware'];
 function renderProducts(list) {
-  let data;
-  if (list) { data = list; }
-  else if (productFilter === 'all') { data = state.products; }
-  else if (PROVINCES.includes(productFilter)) { data = state.products.filter(p=>p.category===productFilter); }
-  else if (SUBCATS.includes(productFilter)) { data = state.products.filter(p=>p.subcategory===productFilter); }
-  else { data = state.products; }
-  const tbody = document.getElementById('products-tbody');
-  tbody.innerHTML = data.map(p => `
+  let all;
+  if (list) { all = list; pageState.products = 1; }
+  else if (productFilter === 'all') { all = state.products; }
+  else if (PROVINCES.includes(productFilter)) { all = state.products.filter(p=>p.category===productFilter); }
+  else if (SUBCATS.includes(productFilter)) { all = state.products.filter(p=>p.subcategory===productFilter); }
+  else { all = state.products; }
+  const { items, total, totalPages, currentPage } = paginate(all, pageState.products);
+  pageState.products = currentPage;
+  document.getElementById('products-tbody').innerHTML = items.map(p => `
     <tr>
       <td>${p.image ? `<img class="img-preview" src="${p.image}" onerror="this.style.display='none'" />` : '<div class="img-preview" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-muted)"><i class="fa-solid fa-bag-shopping"></i></div>'}</td>
       <td><div style="font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text-muted)">${p.brand}</div></td>
@@ -381,8 +438,10 @@ function renderProducts(list) {
       </td>
     </tr>
   `).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No products found</td></tr>`;
-  document.getElementById('products-footer').textContent = `Showing ${data.length} products`;
+  document.getElementById('products-footer').textContent = `Showing ${items.length} of ${total} products`;
+  renderPagination('products-pagination', total, currentPage, totalPages, 'goToPage_products');
 }
+function goToPage_products(p) { pageState.products = p; renderProducts(); }
 
 function handleImgUpload(input) {
   const file = input.files[0];
@@ -521,9 +580,11 @@ function censorAddress(address) {
 }
 
 function renderUsers(list) {
-  const data = list || state.users;
-  const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = data.map(u => `
+  const all = list || state.users;
+  if (list) pageState.users = 1;
+  const { items, total, totalPages, currentPage } = paginate(all, pageState.users);
+  pageState.users = currentPage;
+  document.getElementById('users-tbody').innerHTML = items.map(u => `
     <tr>
       <td><b>${u.username}</b></td>
       <td>${censorEmail(u.email)}</td>
@@ -535,8 +596,10 @@ function renderUsers(list) {
       </td>
     </tr>
   `).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No users registered</td></tr>`;
-  document.getElementById('users-footer').textContent = `Showing ${data.length} users`;
+  document.getElementById('users-footer').textContent = `Showing ${items.length} of ${total} users`;
+  renderPagination('users-pagination', total, currentPage, totalPages, 'goToPage_users');
 }
+function goToPage_users(p) { pageState.users = p; renderUsers(); }
 
 function changeUserRole(id) {
   const u = state.users.find(x=>x.id===id);
@@ -572,7 +635,7 @@ function archiveUser(id) {
 //  ORDERS
 let orderFilter = 'all';
 function filterOrders(status, el) {
-  orderFilter = status;
+  orderFilter = status; pageState.orders = 1;
   document.querySelectorAll('#panel-orders .filter-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   renderOrders();
@@ -615,9 +678,11 @@ function changeOrderStatusInline(id, newStatus) {
 }
 
 function renderOrders(list) {
-  const data = list || (orderFilter==='all' ? state.orders : state.orders.filter(o=>o.status===orderFilter));
-  const tbody = document.getElementById('orders-tbody');
-  tbody.innerHTML = data.map(o => `
+  const all = list || (orderFilter==='all' ? state.orders : state.orders.filter(o=>o.status===orderFilter));
+  if (list) pageState.orders = 1;
+  const { items, total, totalPages, currentPage } = paginate(all, pageState.orders);
+  pageState.orders = currentPage;
+  document.getElementById('orders-tbody').innerHTML = items.map(o => `
     <tr>
       <td><b>${o.id}</b></td>
       <td>${censorName(o.customer)}</td>
@@ -637,8 +702,10 @@ function renderOrders(list) {
       </td>
     </tr>
   `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No orders found</td></tr>`;
-  document.getElementById('orders-footer').textContent = `Showing ${data.length} orders`;
+  document.getElementById('orders-footer').textContent = `Showing ${items.length} of ${total} orders`;
+  renderPagination('orders-pagination', total, currentPage, totalPages, 'goToPage_orders');
 }
+function goToPage_orders(p) { pageState.orders = p; renderOrders(); }
 
 function viewOrder(id) {
   const o = state.orders.find(x=>x.id===id);
@@ -683,9 +750,11 @@ function archiveOrder(id) {
 
 //  VOUCHERS
 function renderVouchers(list) {
-  const data = list || state.vouchers;
-  const tbody = document.getElementById('vouchers-tbody');
-  tbody.innerHTML = data.map(v => `
+  const all = list || state.vouchers;
+  if (list) pageState.vouchers = 1;
+  const { items, total, totalPages, currentPage } = paginate(all, pageState.vouchers);
+  pageState.vouchers = currentPage;
+  document.getElementById('vouchers-tbody').innerHTML = items.map(v => `
     <tr>
       <td><span class="voucher-code">${v.code}</span></td>
       <td>${v.type}</td>
@@ -700,8 +769,10 @@ function renderVouchers(list) {
       </td>
     </tr>
   `).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">No vouchers</td></tr>`;
-  document.getElementById('vouchers-footer').textContent = `Showing ${data.length} vouchers`;
+  document.getElementById('vouchers-footer').textContent = `Showing ${items.length} of ${total} vouchers`;
+  renderPagination('vouchers-pagination', total, currentPage, totalPages, 'goToPage_vouchers');
 }
+function goToPage_vouchers(p) { pageState.vouchers = p; renderVouchers(); }
 
 function saveVoucher() {
   const id = document.getElementById('edit-voucher-id').value;
@@ -754,9 +825,10 @@ function deleteVoucher(id) {
 
 //  ADMINS
 function renderAdmins() {
-  const allAdmins = [state.admin, ...state.admins];
-  const tbody = document.getElementById('admins-tbody');
-  tbody.innerHTML = allAdmins.map(a => `
+  const all = [state.admin, ...state.admins];
+  const { items, total, totalPages, currentPage } = paginate(all, pageState.admins);
+  pageState.admins = currentPage;
+  document.getElementById('admins-tbody').innerHTML = items.map(a => `
     <tr>
       <td><b>${a.username}</b></td>
       <td>${a.email}</td>
@@ -766,8 +838,10 @@ function renderAdmins() {
       <td>${a.id!==state.admin.id ? `<button class="btn btn-sm btn-danger" onclick="deleteAdmin('${a.id}')">Remove</button>` : '<span style="color:var(--text-muted);font-size:12px">You</span>'}</td>
     </tr>
   `).join('');
-  document.getElementById('admins-footer').textContent = `Showing ${allAdmins.length} admins`;
+  document.getElementById('admins-footer').textContent = `Showing ${items.length} of ${total} admins`;
+  renderPagination('admins-pagination', total, currentPage, totalPages, 'goToPage_admins');
 }
+function goToPage_admins(p) { pageState.admins = p; renderAdmins(); }
 
 function saveAdmin() {
   const id = document.getElementById('edit-admin-id').value;
@@ -804,27 +878,35 @@ function logAudit(action, entity, name, admin, desc) {
   state.audit.push({ action, entity, name, admin, desc, time: new Date().toLocaleString() });
 }
 function filterAudit(action, el) {
-  auditFilter = action;
+  auditFilter = action; pageState.audit = 1;
   document.querySelectorAll('#panel-audit .filter-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   renderAudit();
 }
 function renderAudit() {
-  const data = auditFilter==='all' ? state.audit : state.audit.filter(a=>a.action===auditFilter);
+  const all = auditFilter==='all' ? state.audit : state.audit.filter(a=>a.action===auditFilter);
+  const reversed = [...all].reverse();
+  const { items, total, totalPages, currentPage } = paginate(reversed, pageState.audit);
+  pageState.audit = currentPage;
   const classes = { Create:'audit-create', Update:'audit-update', Delete:'audit-delete', Login:'audit-login', Logout:'audit-login', Archive:'audit-archive' };
-  const tbody = document.getElementById('audit-tbody');
-  tbody.innerHTML = [...data].reverse().map(a=>
+  document.getElementById('audit-tbody').innerHTML = items.map(a=>
     `<tr><td style="font-size:12px;color:var(--text-muted)">${a.time}</td><td><span class="audit-action-badge ${classes[a.action]||''}">${a.action}</span></td><td>${a.entity}</td><td>${a.admin}</td><td>${a.desc}</td></tr>`
   ).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No logs</td></tr>`;
-  document.getElementById('audit-footer').textContent = `Showing ${data.length} logs`;
+  document.getElementById('audit-footer').textContent = `Showing ${items.length} of ${total} logs`;
+  renderPagination('audit-pagination', total, currentPage, totalPages, 'goToPage_audit');
 }
+function goToPage_audit(p) { pageState.audit = p; renderAudit(); }
 
 //  ARCHIVES
 function renderArchProducts() {
-  document.getElementById('arch-products-tbody').innerHTML = state.archivedProducts.map(p=>
+  const { items, total, totalPages, currentPage } = paginate(state.archivedProducts, pageState['arch-products']);
+  pageState['arch-products'] = currentPage;
+  document.getElementById('arch-products-tbody').innerHTML = items.map(p=>
     `<tr><td><div class="img-preview" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-muted)"><i class="fa-solid fa-bag-shopping"></i></div></td><td>${p.name}</td><td>${p.category}</td><td>${p.stock}</td><td><button class="btn btn-sm btn-teal" onclick="restoreProduct('${p.id}')">Restore</button></td></tr>`
   ).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No archived products</td></tr>';
+  renderPagination('arch-products-pagination', total, currentPage, totalPages, 'goToPage_archProducts');
 }
+function goToPage_archProducts(p) { pageState['arch-products'] = p; renderArchProducts(); }
 function restoreProduct(id) {
   const idx = state.archivedProducts.findIndex(x=>x.id===id);
   if(idx<0) return;
@@ -838,10 +920,14 @@ function restoreProduct(id) {
 }
 
 function renderArchUsers() {
-  document.getElementById('arch-users-tbody').innerHTML = state.archivedUsers.map(u=>
+  const { items, total, totalPages, currentPage } = paginate(state.archivedUsers, pageState['arch-users']);
+  pageState['arch-users'] = currentPage;
+  document.getElementById('arch-users-tbody').innerHTML = items.map(u=>
     `<tr><td>${u.username}</td><td>${censorEmail(u.email)}</td><td>${u.role}</td><td><button class="btn btn-sm btn-teal" onclick="restoreUser('${u.id}')">Restore</button></td></tr>`
   ).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">No archived users</td></tr>';
+  renderPagination('arch-users-pagination', total, currentPage, totalPages, 'goToPage_archUsers');
 }
+function goToPage_archUsers(p) { pageState['arch-users'] = p; renderArchUsers(); }
 function restoreUser(id) {
   const idx = state.archivedUsers.findIndex(x=>x.id===id);
   if(idx<0) return;
@@ -854,10 +940,14 @@ function restoreUser(id) {
 }
 
 function renderArchOrders() {
-  document.getElementById('arch-orders-tbody').innerHTML = state.archivedOrders.map(o=>
+  const { items, total, totalPages, currentPage } = paginate(state.archivedOrders, pageState['arch-orders']);
+  pageState['arch-orders'] = currentPage;
+  document.getElementById('arch-orders-tbody').innerHTML = items.map(o=>
     `<tr><td>${o.id}</td><td>${censorName(o.customer)}</td><td>₱${o.total}</td><td><span class="badge badge-${o.status.toLowerCase()}">${o.status}</span></td><td>${o.date}</td><td><button class="btn btn-sm btn-teal" onclick="restoreOrder('${o.id}')">Restore</button></td></tr>`
   ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No archived orders</td></tr>';
+  renderPagination('arch-orders-pagination', total, currentPage, totalPages, 'goToPage_archOrders');
 }
+function goToPage_archOrders(p) { pageState['arch-orders'] = p; renderArchOrders(); }
 function restoreOrder(id) {
   const idx = state.archivedOrders.findIndex(x=>x.id===id);
   if(idx<0) return;
@@ -914,8 +1004,9 @@ function updateSidebarAdmin() {
 //  SEARCH
 function globalSearch(q) {
   q = q.toLowerCase();
-  if(!q) { renderByPanel(getActivePanel()); return; }
   const panel = getActivePanel();
+  if(!q) { pageState[panel] = 1; renderByPanel(panel); return; }
+  pageState[panel] = 1;
   if(panel==='products') renderProducts(state.products.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q)||(p.subcategory||'').toLowerCase().includes(q)));
   else if(panel==='users') renderUsers(state.users.filter(u=>u.username.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)));
   else if(panel==='orders') renderOrders(state.orders.filter(o=>o.id.toLowerCase().includes(q)||o.customer.toLowerCase().includes(q)));
