@@ -1,105 +1,157 @@
 <?php
+// ═══════════════════════════════════════════════════════════
+//  SouCul Admin API — Front Controller
+//  All requests are routed here via .htaccess
+// ═══════════════════════════════════════════════════════════
 
-// Enable CORS
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+require_once __DIR__ . '/../../shared/config/Database.php';
+require_once __DIR__ . '/../../shared/helpers/functions.php';
+require_once __DIR__ . '/../../shared/middleware/auth.php';
+
+// ── CORS ──────────────────────────────────────────────────
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');  // restrict to your frontend domain in production
+header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    http_response_code(204);
     exit;
 }
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-
-use Dotenv\Dotenv;
-use App\Shared\Config\Database;
-use App\Shared\Middleware\AuthMiddleware;
-use App\Admin\Controllers\AuthController;
-use App\Admin\Controllers\ProductController;
-use App\Admin\Controllers\OrderController;
-use App\Admin\Controllers\UserController;
-use App\Admin\Controllers\AdminController;
-
-// Load environment variables
-$dotenv = Dotenv::createImmutable(__DIR__ . '/../../');
-$dotenv->load();
-
-// Get request method and URI
+// ── Route Matching ─────────────────────────────────────────
+$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$path = rtrim(preg_replace('#^/soucul/api#', '', $path), '/');
 $method = $_SERVER['REQUEST_METHOD'];
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = str_replace('/backend/admin/public/index.php', '', $uri);
-$uri = str_replace('/backend/admin', '', $uri);
-$uri = rtrim($uri, '/');
 
-// Health check
-if ($uri === '/health' && $method === 'GET') {
-    echo json_encode(['success' => true, 'message' => 'API is running']);
-    exit;
+// helper: match pattern like /v1/admin/products/:id
+function matchRoute(string $pattern, string $path): array|false {
+    $regex = preg_replace('#:([a-zA-Z_]+)#', '(?P<$1>[^/]+)', $pattern);
+    $regex = '#^' . $regex . '$#';
+    if (preg_match($regex, $path, $m)) {
+        return array_filter($m, 'is_string', ARRAY_FILTER_USE_KEY);
+    }
+    return false;
 }
 
-// Public routes (no auth required)
-if ($uri === '/api/v1/admin/auth/login' && $method === 'POST') {
-    AuthController::adminLogin();
-    exit;
+// ── Health Check ───────────────────────────────────────────
+if ($path === '/health' && $method === 'GET') {
+    success(['status' => 'ok', 'timestamp' => date('c')], 'API is running');
 }
 
-// Protected routes (require authentication)
-$admin = AuthMiddleware::verifyAdminToken();
-if (!$admin) {
-    exit;
+// ── AUTH ───────────────────────────────────────────────────
+if ($path === '/v1/admin/auth/login' && $method === 'POST') {
+    require __DIR__ . '/api/v1/admin/auth/login.php';
 }
 
-// Route matching
-match (true) {
-    // Admin profile
-    $uri === '/api/v1/admin/profile' && $method === 'GET' 
-        => AuthController::getAdminProfile($admin),
-    
-    // Dashboard stats
-    $uri === '/api/v1/admin/dashboard/stats' && $method === 'GET' 
-        => AdminController::getDashboardStats(),
-    
-    // Products
-    $uri === '/api/v1/admin/products' && $method === 'GET' 
-        => ProductController::getAllProducts(),
-    $uri === '/api/v1/admin/products' && $method === 'POST' 
-        => ProductController::createProduct($admin),
-    preg_match('#^/api/v1/admin/products/(\d+)$#', $uri, $matches) && $method === 'PATCH' 
-        => ProductController::updateProduct((int)$matches[1], $admin),
-    preg_match('#^/api/v1/admin/products/(\d+)/inventory$#', $uri, $matches) && $method === 'PATCH' 
-        => ProductController::updateInventory((int)$matches[1]),
-    
-    // Orders
-    $uri === '/api/v1/admin/orders' && $method === 'GET' 
-        => OrderController::getAllOrders(),
-    preg_match('#^/api/v1/admin/orders/(\d+)$#', $uri, $matches) && $method === 'GET' 
-        => OrderController::getOrderDetails((int)$matches[1]),
-    preg_match('#^/api/v1/admin/orders/(\d+)/status$#', $uri, $matches) && $method === 'PATCH' 
-        => OrderController::updateOrderStatus((int)$matches[1]),
-    
-    // Users
-    $uri === '/api/v1/admin/users' && $method === 'GET' 
-        => UserController::getAllUsers(),
-    preg_match('#^/api/v1/admin/users/(\d+)/toggle$#', $uri, $matches) && $method === 'PATCH' 
-        => UserController::toggleUserStatus((int)$matches[1]),
-    
-    // Admins
-    $uri === '/api/v1/admin/admins' && $method === 'GET' 
-        => AdminController::getAllAdmins(),
-    $uri === '/api/v1/admin/admins' && $method === 'POST' 
-        => AdminController::createAdmin($admin),
-    preg_match('#^/api/v1/admin/admins/(\d+)/toggle$#', $uri, $matches) && $method === 'PATCH' 
-        => AdminController::toggleAdminStatus((int)$matches[1], $admin),
-    
-    // 404 Not Found
-    default => (function() {
-        http_response_code(404);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Endpoint not found',
-            'data' => null
-        ]);
-    })()
-};
+// ── PROFILE ────────────────────────────────────────────────
+if ($path === '/v1/admin/profile' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/profile/get.php';
+}
+if ($path === '/v1/admin/profile' && $method === 'PATCH') {
+    require __DIR__ . '/api/v1/admin/profile/update.php';
+}
+if ($path === '/v1/admin/profile/password' && $method === 'POST') {
+    require __DIR__ . '/api/v1/admin/profile/password.php';
+}
+if ($path === '/v1/admin/profile/sessions' && $method === 'DELETE') {
+    require __DIR__ . '/api/v1/admin/profile/sessions.php';
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────
+if ($path === '/v1/admin/dashboard/stats' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/dashboard/stats.php';
+}
+if ($path === '/v1/admin/dashboard/analytics' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/dashboard/analytics.php';
+}
+
+// ── PRODUCTS ───────────────────────────────────────────────
+if ($path === '/v1/admin/products' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/products/index.php';
+}
+if ($path === '/v1/admin/products' && $method === 'POST') {
+    require __DIR__ . '/api/v1/admin/products/create.php';
+}
+if ($m = matchRoute('/v1/admin/products/:id', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/products/update.php'; }
+    if ($method === 'DELETE') { $_route = $m; require __DIR__ . '/api/v1/admin/products/archive.php'; }
+}
+if ($m = matchRoute('/v1/admin/products/:id/inventory', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/products/inventory.php'; }
+}
+
+// ── ORDERS ─────────────────────────────────────────────────
+if ($path === '/v1/admin/orders' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/orders/index.php';
+}
+if ($m = matchRoute('/v1/admin/orders/:id', $path)) {
+    if ($method === 'GET')   { $_route = $m; require __DIR__ . '/api/v1/admin/orders/show.php'; }
+    if ($method === 'DELETE') { $_route = $m; require __DIR__ . '/api/v1/admin/orders/archive.php'; }
+}
+if ($m = matchRoute('/v1/admin/orders/:id/status', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/orders/status.php'; }
+}
+
+// ── USERS ──────────────────────────────────────────────────
+if ($path === '/v1/admin/users' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/users/index.php';
+}
+if ($m = matchRoute('/v1/admin/users/:id', $path)) {
+    if ($method === 'GET')   { $_route = $m; require __DIR__ . '/api/v1/admin/users/show.php'; }
+    if ($method === 'DELETE') { $_route = $m; require __DIR__ . '/api/v1/admin/users/archive.php'; }
+}
+if ($m = matchRoute('/v1/admin/users/:id/toggle', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/users/toggle.php'; }
+}
+
+// ── ADMINS ─────────────────────────────────────────────────
+if ($path === '/v1/admin/admins' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/admins/index.php';
+}
+if ($path === '/v1/admin/admins' && $method === 'POST') {
+    require __DIR__ . '/api/v1/admin/admins/create.php';
+}
+if ($m = matchRoute('/v1/admin/admins/:id/toggle', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/admins/toggle.php'; }
+}
+
+// ── VOUCHERS ───────────────────────────────────────────────
+if ($path === '/v1/admin/vouchers' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/vouchers/index.php';
+}
+if ($path === '/v1/admin/vouchers' && $method === 'POST') {
+    require __DIR__ . '/api/v1/admin/vouchers/create.php';
+}
+if ($m = matchRoute('/v1/admin/vouchers/:id', $path)) {
+    if ($method === 'PATCH')  { $_route = $m; require __DIR__ . '/api/v1/admin/vouchers/update.php'; }
+    if ($method === 'DELETE') { $_route = $m; require __DIR__ . '/api/v1/admin/vouchers/delete.php'; }
+}
+
+// ── ARCHIVE ────────────────────────────────────────────────
+if ($path === '/v1/admin/archive/products' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/archive/products.php';
+}
+if ($m = matchRoute('/v1/admin/archive/products/:id/restore', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/archive/restore_product.php'; }
+}
+if ($path === '/v1/admin/archive/users' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/archive/users.php';
+}
+if ($m = matchRoute('/v1/admin/archive/users/:id/restore', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/archive/restore_user.php'; }
+}
+if ($path === '/v1/admin/archive/orders' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/archive/orders.php';
+}
+if ($m = matchRoute('/v1/admin/archive/orders/:id/restore', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/archive/restore_order.php'; }
+}
+
+// ── AUDIT ──────────────────────────────────────────────────
+if ($path === '/v1/admin/audit' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/audit/index.php';
+}
+
+// ── 404 ────────────────────────────────────────────────────
+error("Route not found: $method $path", 404);

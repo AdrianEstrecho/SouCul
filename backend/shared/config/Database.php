@@ -1,41 +1,26 @@
 <?php
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'soucul');
+define('DB_USER', 'soucul_dev');
+define('DB_PASS', 'SouCul@2026');   
+define('DB_CHARSET', 'utf8mb4');
 
-namespace App\Config;
-
-use PDO;
-use PDOException;
-
-class Database {
-    private static ?PDO $connection = null;
-
-    public static function getConnection(): PDO {
-        if (self::$connection === null) {
-            try {
-                $host = $_ENV['DB_HOST'];
-                $port = $_ENV['DB_PORT'];
-                $dbname = $_ENV['DB_DATABASE'];
-                $username = $_ENV['DB_USERNAME'];
-                $password = $_ENV['DB_PASSWORD'];
-
-                $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
-                
-                self::$connection = new PDO($dsn, $username, $password, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]);
-            } catch (PDOException $e) {
-                error_log("Database connection failed: " . $e->getMessage());
-                http_response_code(500);
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Database connection failed',
-                    'data' => null
-                ]);
-                exit;
-            }
+function getDB(): PDO {
+    static $pdo = null;
+    if ($pdo === null) {
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+        try {
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Database connection failed']);
+            exit;
         }
-
-        return self::$connection;
     }
+    return $pdo;
 }
