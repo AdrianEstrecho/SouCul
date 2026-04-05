@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "php -S 127.0.0.1:8000 -t backend/admin/public backend/admin/public/index.php",
-    "dev:all": "concurrently -k -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev\"",
+    "dev:api": "npm run dev:api:admin",
+    "dev:api:admin": "php -S 127.0.0.1:8000 -t backend/admin/public backend/admin/public/index.php",
+    "dev:api:customer": "php -S 127.0.0.1:8001 -t backend/customer/public backend/customer/public/index.php",
+    "dev:api:all": "concurrently -k -n admin,customer -c cyan,yellow \"npm run dev:api:admin\" \"npm run dev:api:customer\"",
+    "dev:all": "concurrently -k -n admin,customer,web -c cyan,yellow,magenta \"npm run dev:api:admin\" \"npm run dev:api:customer\" \"npm run dev\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

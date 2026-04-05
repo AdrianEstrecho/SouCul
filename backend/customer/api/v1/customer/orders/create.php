@@ -78,6 +78,44 @@ foreach ($cartItems as $item) {
 $stmt = $db->prepare("DELETE FROM cart_items WHERE user_id = ?");
 $stmt->execute([$userId]);
 
+createCustomerNotification(
+    $db,
+    (int) $userId,
+    'Order placed',
+    "Your order {$orderNumber} has been placed successfully.",
+    'order_created',
+    [
+        'order_id' => (int) $orderId,
+        'order_number' => $orderNumber,
+    ]
+);
+
+try {
+    $adminStmt = $db->query("SELECT id FROM admins WHERE is_active = 1");
+    $adminRows = $adminStmt->fetchAll();
+    foreach ($adminRows as $adminRow) {
+        $targetAdminId = (int) ($adminRow['id'] ?? 0);
+        if ($targetAdminId <= 0) {
+            continue;
+        }
+
+        createAdminNotification(
+            $db,
+            $targetAdminId,
+            'New customer order',
+            "Order {$orderNumber} was placed and is awaiting processing.",
+            'order_created',
+            [
+                'order_id' => (int) $orderId,
+                'order_number' => $orderNumber,
+                'user_id' => (int) $userId,
+            ]
+        );
+    }
+} catch (Throwable) {
+    // Notification fan-out should not block successful checkout.
+}
+
 success([
     'order_number' => $orderNumber,
     'total_amount' => $subtotal

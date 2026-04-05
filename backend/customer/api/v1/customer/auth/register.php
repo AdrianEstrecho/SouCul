@@ -36,6 +36,14 @@ $token = jwtEncode([
     'email'   => $email,
 ]);
 
+createCustomerNotification(
+    $db,
+    (int) $userId,
+    'Welcome to SouCul',
+    'Your account was created successfully. Start exploring regional products!',
+    'account_created'
+);
+
 success([
     'token' => $token,
     'user' => [

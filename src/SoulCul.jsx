@@ -4,7 +4,6 @@ import "./StyleSheet/ViganCss.css";
 
 import LandingPage from "./Components/LandingPage";
 import HomePin from "./Components/HomePin";
-import ProductPage from "./ProductPage";
 
 import ViganClothes from "./Vigan/Clothes";
 import ViganHandicrafts from "./Vigan/Handicrafts";
@@ -41,6 +40,7 @@ import Cart from "./Cart";
 import Checkout from "./Checkout";
 import Profile from "./Profile";
 import Login from "./Login";
+import { getCookie, getJsonCookie, removeCookie, setCookie } from "./utils/cookieState";
 
 // ── Login Required Modal ──
 function LoginRequiredModal({ onClose, onGoToLogin }) {
@@ -68,6 +68,8 @@ function LoginRequiredModal({ onClose, onGoToLogin }) {
 
 
 export default function SoulCul() {
+  const GUEST_PROFILE = { name: "Guest", email: "", phone: "", birthday: "", gender: "", createdAt: "" };
+
   // Ctrl+Alt+. shortcut to open admin panel
   useEffect(() => {
     const handleAdminShortcut = (e) => {
@@ -80,22 +82,162 @@ export default function SoulCul() {
     return () => window.removeEventListener("keydown", handleAdminShortcut);
   }, []);
 
+  const [authReady, setAuthReady] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [directCheckoutItem, setDirectCheckoutItem] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem("soulcul_loggedIn") === "true");
-  const [isGuest, setIsGuest] = useState(() => localStorage.getItem("soulcul_currentUser") === "guest");
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const legacyFlag = getCookie("soulcul_loggedIn") === "true";
+    const hasToken = !!getCookie("customer_token");
+    return legacyFlag || hasToken;
+  });
+  const [isGuest, setIsGuest] = useState(() => getCookie("soulcul_currentUser") === "guest");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [userProfile, setUserProfile] = useState(() => {
-    const currentUser = localStorage.getItem("soulcul_currentUser");
-    if (currentUser) {
-      const users = JSON.parse(localStorage.getItem("soulcul_users") || "{}");
-      const u = users[currentUser];
-      if (u) return { name: u.firstname + " " + u.lastname, email: u.email, phone: u.phone || "", birthday: u.birthday || "", gender: u.gender || "" };
+    const currentUser = getCookie("soulcul_currentUser");
+    const tokenUser = getJsonCookie("customer_user", null);
+
+    if (tokenUser) {
+      const firstName = tokenUser?.first_name || "";
+      const lastName = tokenUser?.last_name || "";
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      return {
+        name: fullName || tokenUser?.email || "Customer",
+        email: tokenUser?.email || "",
+        phone: "",
+        birthday: "",
+        gender: "",
+        createdAt: "",
+      };
     }
-    return { name: "Guest", email: "", phone: "", birthday: "", gender: "" };
+
+    if (currentUser) {
+      return {
+        name: currentUser,
+        email: currentUser,
+        phone: "",
+        birthday: "",
+        gender: "",
+        createdAt: "",
+      };
+    }
+    return GUEST_PROFILE;
   });
 
+  const getCustomerApi = () => window.CustomerAPI;
+
+  const clearCustomerSession = () => {
+    removeCookie("soulcul_loggedIn");
+    removeCookie("soulcul_currentUser");
+    removeCookie("customer_token");
+    removeCookie("customer_user");
+  };
+
+  const resolveImageUrl = (rawUrl) => {
+    const value = String(rawUrl || "").trim();
+    if (!value) return "";
+    if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) return value;
+    if (value.startsWith("/")) return value;
+    return `/${value.replace(/^\/+/, "")}`;
+  };
+
+  const toCartItem = (row) => ({
+    cartId: Number(row.id),
+    id: Number(row.product_id),
+    name: row.name || "Product",
+    location: row.location_name || "SouCul",
+    image: resolveImageUrl(row.featured_image_url),
+    price: Number(row.discount_price ?? row.price ?? 0),
+    qty: Math.max(1, Number(row.quantity || 1)),
+    checked: false,
+  });
+
+  const hydrateCartFromAPI = async () => {
+    const api = getCustomerApi();
+    if (!api || typeof api.getCart !== "function") return;
+
+    const result = await api.getCart();
+    const rows = Array.isArray(result?.data) ? result.data : [];
+    setCartItems(rows.map(toCartItem));
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrateSession = async () => {
+      const api = getCustomerApi();
+      const token = getCookie("customer_token");
+      const guestMode = getCookie("soulcul_currentUser") === "guest";
+
+      if (guestMode) {
+        if (!active) return;
+        setIsLoggedIn(true);
+        setIsGuest(true);
+        setUserProfile(GUEST_PROFILE);
+        setAuthReady(true);
+        return;
+      }
+
+      if (!token) {
+        clearCustomerSession();
+        if (!active) return;
+        setIsLoggedIn(false);
+        setIsGuest(false);
+        setUserProfile(GUEST_PROFILE);
+        setCartItems([]);
+        setAuthReady(true);
+        return;
+      }
+
+      setCookie("soulcul_loggedIn", "true");
+      if (!active) return;
+      setIsLoggedIn(true);
+      setIsGuest(false);
+
+      try {
+        if (api && typeof api.getProfile === "function") {
+          const profileRes = await api.getProfile();
+          const p = profileRes?.data || {};
+          const fullName = `${p.first_name || ""} ${p.last_name || ""}`.trim();
+          const mappedProfile = {
+            name: fullName || p.email || "Customer",
+            email: p.email || "",
+            phone: p.phone || "",
+            birthday: p.birthday || "",
+            gender: p.gender || "",
+            createdAt: p.created_at || "",
+          };
+          if (active) setUserProfile(mappedProfile);
+          if (p.email) setCookie("soulcul_currentUser", p.email);
+        }
+
+        await hydrateCartFromAPI();
+      } catch (error) {
+        console.error("Failed to restore customer session:", error);
+        clearCustomerSession();
+        if (active) {
+          setIsLoggedIn(false);
+          setIsGuest(false);
+          setUserProfile(GUEST_PROFILE);
+          setCartItems([]);
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    };
+
+    hydrateSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleLogin = (profile) => {
+    setCookie("soulcul_loggedIn", "true");
+    if (profile?.email) {
+      setCookie("soulcul_currentUser", profile.email);
+    }
+
     setIsLoggedIn(true);
     setIsGuest(false);
     setUserProfile({
@@ -104,24 +246,35 @@ export default function SoulCul() {
       phone: profile.phone || "",
       birthday: profile.birthday || "",
       gender: profile.gender || "",
+      createdAt: profile.createdAt || "",
+    });
+
+    hydrateCartFromAPI().catch((error) => {
+      console.error("Failed to hydrate cart after login:", error);
     });
   };
 
   const handleGuestLogin = () => {
-    localStorage.setItem("soulcul_loggedIn", "true");
-    localStorage.setItem("soulcul_currentUser", "guest");
+    setCookie("soulcul_loggedIn", "true");
+    setCookie("soulcul_currentUser", "guest");
     setIsLoggedIn(true);
     setIsGuest(true);
-    setUserProfile({ name: "Guest", email: "", phone: "", birthday: "", gender: "" });
+    setUserProfile(GUEST_PROFILE);
+    setCartItems([]);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("soulcul_loggedIn");
-    localStorage.removeItem("soulcul_currentUser");
+    const api = getCustomerApi();
+    if (api && typeof api.logout === "function") {
+      api.logout();
+    }
+
+    clearCustomerSession();
     setIsLoggedIn(false);
     setIsGuest(false);
-    setUserProfile({ name: "Guest", email: "", phone: "", birthday: "", gender: "" });
+    setUserProfile(GUEST_PROFILE);
     setCartItems([]);
+    setDirectCheckoutItem(null);
   };
 
   // Add a product to the cart — requires real login (not guest)
@@ -130,34 +283,55 @@ export default function SoulCul() {
       setShowLoginModal(true);
       return;
     }
+
     try {
-      const api = window.CustomerAPI;
+      const api = getCustomerApi();
       await api.addToCart(product.id, product.qty || 1);
-      const addQty = product.qty || 1;
-      setCartItems((prev) => {
-        const existing = prev.find((i) => i.id === product.id);
-        if (existing) {
-          return prev.map((i) =>
-            i.id === product.id ? { ...i, qty: i.qty + addQty } : i
-          );
-        }
-        return [...prev, { ...product, cartId: Date.now(), qty: addQty, checked: false }];
-      });
+      await hydrateCartFromAPI();
     } catch (error) {
       console.error('Failed to add to cart:', error);
     }
   };
 
   // Update qty or checked state
-  const handleUpdateQty = (cartId, qty, checked) => {
-    setCartItems((prev) =>
-      prev.map((i) => i.cartId === cartId ? { ...i, qty, checked } : i)
-    );
+  const handleUpdateQty = async (cartId, qty, checked) => {
+    let previousQty = qty;
+
+    setCartItems((prev) => {
+      const target = prev.find((i) => i.cartId === cartId);
+      previousQty = target ? target.qty : qty;
+      return prev.map((i) => i.cartId === cartId ? { ...i, qty, checked } : i);
+    });
+
+    if (!isLoggedIn || isGuest || qty === previousQty) return;
+
+    try {
+      const api = getCustomerApi();
+      await api.updateCartItem(cartId, qty);
+    } catch (error) {
+      console.error("Failed to sync cart quantity:", error);
+      try {
+        await hydrateCartFromAPI();
+      } catch (refreshError) {
+        console.error("Failed to refresh cart after quantity sync error:", refreshError);
+      }
+    }
   };
 
   // Remove item from cart
-  const handleRemove = (cartId) => {
+  const handleRemove = async (cartId) => {
+    const previous = cartItems;
     setCartItems((prev) => prev.filter((i) => i.cartId !== cartId));
+
+    if (!isLoggedIn || isGuest) return;
+
+    try {
+      const api = getCustomerApi();
+      await api.removeCartItem(cartId);
+    } catch (error) {
+      console.error("Failed to remove cart item:", error);
+      setCartItems(previous);
+    }
   };
 
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
@@ -170,6 +344,28 @@ export default function SoulCul() {
     setDirectCheckoutItem({ ...product, qty: product.qty || 1 });
   };
 
+  const handleOrderPlaced = async () => {
+    setDirectCheckoutItem(null);
+    try {
+      await hydrateCartFromAPI();
+    } catch (error) {
+      console.error("Failed to refresh cart after order placement:", error);
+      setCartItems([]);
+    }
+  };
+
+  const renderProtected = (element) => {
+    if (!authReady) {
+      return (
+        <div style={{ minHeight: "60vh", display: "grid", placeItems: "center", fontWeight: 600, color: "#5c5c5c" }}>
+          Loading your account...
+        </div>
+      );
+    }
+
+    return (!isLoggedIn || isGuest) ? <Navigate to="/Login" replace /> : element;
+  };
+
   // Shared props to pass to every page
   const cartProps = { cartCount, onAddToCart: handleAddToCart, onDirectCheckout: handleDirectCheckout, isGuest };
 
@@ -178,7 +374,7 @@ export default function SoulCul() {
       <Routes>
         <Route path="/"            element={<LandingPage {...cartProps} />} />
         <Route path="/Map"         element={<HomePin {...cartProps} />} />
-        <Route path="/Products"    element={<ProductPage {...cartProps} onDirectCheckout={handleDirectCheckout} />} />
+        <Route path="/Products"    element={<Navigate to="/Map" replace />} />
         <Route path="/AboutUs"     element={<AboutUs {...cartProps} />} />
 
         {/* Vigan */}
@@ -217,13 +413,17 @@ export default function SoulCul() {
         <Route path="/Bohol/Homeware"     element={<BoholHomeware     {...cartProps} />} />
 
         <Route path="/Cart" element={
-          !isLoggedIn || isGuest ? <Navigate to="/Login" replace /> :
+          renderProtected(
           <Cart
+            cartItems={cartItems}
+            onUpdateQty={handleUpdateQty}
+            onRemove={handleRemove}
             cartCount={cartCount}
           />
+          )
         } />
         <Route path="/Checkout" element={
-          !isLoggedIn || isGuest ? <Navigate to="/Login" replace /> :
+          renderProtected(
           <Checkout
             cartItems={cartItems}
             onRemove={handleRemove}
@@ -231,10 +431,12 @@ export default function SoulCul() {
             userProfile={userProfile}
             directCheckoutItem={directCheckoutItem}
             onClearDirectCheckout={() => setDirectCheckoutItem(null)}
+            onOrderPlaced={handleOrderPlaced}
           />
+          )
         } />
         <Route path="/Profile" element={
-          !isLoggedIn || isGuest ? <Navigate to="/Login" replace /> :
+          renderProtected(
           <Profile
             userProfile={userProfile}
             onUpdateProfile={setUserProfile}
@@ -242,8 +444,12 @@ export default function SoulCul() {
             isLoggedIn={isLoggedIn}
             onLogout={handleLogout}
           />
+          )
         } />
         <Route path="/Login" element={
+          authReady && isLoggedIn && !isGuest
+            ? <Navigate to="/" replace />
+            :
           <Login onLogin={handleLogin} onGuestLogin={handleGuestLogin} />
         } />
       </Routes>

@@ -41,29 +41,35 @@ const icons = {
   link: ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"],
 };
 
-// ── Mock Data ──────────────────────────────────────────────────────────────
-const mockOrders = [
-  { id: "#ORD-2841", date: "Mar 20, 2026", status: "Delivered", total: 2350, items: 2, img: "🧵" },
-  { id: "#ORD-2790", date: "Mar 12, 2026", status: "In Transit", total: 999, items: 1, img: "👕" },
-  { id: "#ORD-2744", date: "Feb 28, 2026", status: "Processing", total: 4500, items: 3, img: "🎁" },
-];
-
-const mockWishlist = [
-  { id: 1, name: "Inabel Weave Blazer", price: 3200, location: "Vigan", emoji: "🧥" },
-  { id: 2, name: "Burnay Print Dress", price: 1800, location: "Ilocos", emoji: "👗" },
-  { id: 3, name: "Cordillera Wrap Skirt", price: 1250, location: "Baguio", emoji: "🩱" },
-];
-
-const mockAddresses = [
-  { id: 1, label: "Home", address: "123 Calle Crisologo, Vigan City, Ilocos Sur 2700", default: true },
-  { id: 2, label: "Office", address: "45 Session Road, Baguio City, Benguet 2600", default: false },
-];
-
 const statusColor = {
-  Delivered: { bg: "#d1fae5", color: "#065f46" },
-  "In Transit": { bg: "#dbeafe", color: "#1e40af" },
-  Processing: { bg: "#fef3c7", color: "#92400e" },
+  delivered: { bg: "#d1fae5", color: "#065f46" },
+  shipped: { bg: "#dbeafe", color: "#1e40af" },
+  processing: { bg: "#fef3c7", color: "#92400e" },
+  confirmed: { bg: "#dbeafe", color: "#1e40af" },
+  pending: { bg: "#fef3c7", color: "#92400e" },
+  cancelled: { bg: "#fee2e2", color: "#991b1b" },
 };
+
+const EMPTY_STATE_STYLE = { fontSize: 13, color: "#888", padding: "8px 0" };
+
+const safeDateLabel = (value) => {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not set";
+  return date.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+};
+
+const safeText = (value, fallback = "Not set") => {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+};
+
+const formatStatus = (value) => {
+  const raw = String(value || "pending").toLowerCase();
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
+const formatPeso = (value) => `₱${Number(value || 0).toLocaleString()}`;
 
 // ── Modal Overlay ─────────────────────────────────────────────────────────
 function Modal({ title, onClose, children }) {
@@ -421,14 +427,15 @@ function TwoFAModal({ enabled, onClose }) {
 }
 
 // ── Profile Details Section ────────────────────────────────────────────────
-function ProfileDetailsSection({ user, photo, onEdit, onChangePhoto }) {
-  const initials = user.name.split(" ").map(n => n[0]).join("");
+function ProfileDetailsSection({ user, photo, stats, onEdit, onChangePhoto }) {
+  const initials = (user.name || "?").split(" ").filter(Boolean).map(n => n[0]).join("") || "?";
+  const memberSince = safeDateLabel(user.createdAt);
   const details = [
-    { label: "Full Name", value: user.name, emoji: "👤" },
-    { label: "Email Address", value: user.email, emoji: "✉️" },
-    { label: "Phone Number", value: user.phone, emoji: "📞" },
-    { label: "Birthday", value: new Date(user.birthday).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }), emoji: "🎂" },
-    { label: "Gender", value: user.gender, emoji: "🧬" },
+    { label: "Full Name", value: safeText(user.name), emoji: "👤" },
+    { label: "Email Address", value: safeText(user.email), emoji: "✉️" },
+    { label: "Phone Number", value: safeText(user.phone), emoji: "📞" },
+    { label: "Birthday", value: safeDateLabel(user.birthday), emoji: "🎂" },
+    { label: "Gender", value: safeText(user.gender), emoji: "🧬" },
   ];
 
   return (
@@ -443,8 +450,8 @@ function ProfileDetailsSection({ user, photo, onEdit, onChangePhoto }) {
           <div className="avatar-cam"><Icon d={icons.camera} size={12} /></div>
         </div>
         <div>
-          <div className="pd-avatar-name">{user.name}</div>
-          <div className="pd-avatar-sub">Member since January 2024</div>
+          <div className="pd-avatar-name">{safeText(user.name, "Customer")}</div>
+          <div className="pd-avatar-sub">Member since {memberSince}</div>
           <button className="change-photo-link" onClick={onChangePhoto}>Change photo</button>
         </div>
       </div>
@@ -460,13 +467,13 @@ function ProfileDetailsSection({ user, photo, onEdit, onChangePhoto }) {
         ))}
       </div>
       <div className="pd-account-strip">
-        <div className="pd-strip-item"><div className="pd-strip-num">12</div><div className="pd-strip-label">Total Orders</div></div>
+        <div className="pd-strip-item"><div className="pd-strip-num">{stats.totalOrders}</div><div className="pd-strip-label">Total Orders</div></div>
         <div className="pd-strip-divider" />
-        <div className="pd-strip-item"><div className="pd-strip-num">3</div><div className="pd-strip-label">Wishlist Items</div></div>
+        <div className="pd-strip-item"><div className="pd-strip-num">{stats.wishlistItems}</div><div className="pd-strip-label">Wishlist Items</div></div>
         <div className="pd-strip-divider" />
-        <div className="pd-strip-item"><div className="pd-strip-num">8</div><div className="pd-strip-label">Reviews Given</div></div>
+        <div className="pd-strip-item"><div className="pd-strip-num">{stats.reviewsGiven}</div><div className="pd-strip-label">Reviews Given</div></div>
         <div className="pd-strip-divider" />
-        <div className="pd-strip-item"><div className="pd-strip-num">₱12,450</div><div className="pd-strip-label">Total Spent</div></div>
+        <div className="pd-strip-item"><div className="pd-strip-num">{formatPeso(stats.totalSpent)}</div><div className="pd-strip-label">Total Spent</div></div>
       </div>
     </div>
   );
@@ -474,42 +481,128 @@ function ProfileDetailsSection({ user, photo, onEdit, onChangePhoto }) {
 
 // ── Other Sections ─────────────────────────────────────────────────────────
 function OrdersSection() {
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOrders = async () => {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        if (!customerAPI || typeof customerAPI.getOrders !== "function") {
+          throw new Error("Orders API is unavailable.");
+        }
+
+        const result = await customerAPI.getOrders();
+        if (!mounted) return;
+        setOrders(Array.isArray(result?.data) ? result.data : []);
+      } catch (error) {
+        if (!mounted) return;
+        setLoadError(error?.message || "Failed to load orders.");
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    loadOrders();
+    return () => { mounted = false; };
+  }, []);
+
   return (
     <div className="section-content">
       <h3 className="section-title">My Orders</h3>
+      {isLoading && <div style={EMPTY_STATE_STYLE}>Loading orders...</div>}
+      {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
+      {!isLoading && !loadError && orders.length === 0 && <div style={EMPTY_STATE_STYLE}>No orders yet.</div>}
       <div className="orders-list">
-        {mockOrders.map((o) => (
+        {orders.map((o) => {
+          const rawStatus = String(o.status || "pending").toLowerCase();
+          const statusStyle = statusColor[rawStatus] || statusColor.pending;
+          return (
           <div key={o.id} className="order-card">
-            <div className="order-emoji">{o.img}</div>
+            <div className="order-emoji">📦</div>
             <div className="order-info">
-              <div className="order-id">{o.id}</div>
-              <div className="order-meta">{o.date} · {o.items} item{o.items > 1 ? "s" : ""}</div>
+              <div className="order-id">#{o.id}</div>
+              <div className="order-meta">{safeDateLabel(o.created_at)}</div>
             </div>
             <div className="order-right">
-              <span className="order-status" style={statusColor[o.status]}>{o.status}</span>
-              <div className="order-total">₱{o.total.toLocaleString()}</div>
+              <span className="order-status" style={statusStyle}>{formatStatus(rawStatus)}</span>
+              <div className="order-total">{formatPeso(o.total_amount)}</div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
 function WishlistSection() {
-  const [list, setList] = useState(mockWishlist);
+  const [list, setList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadWishlist = async () => {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        if (!customerAPI || typeof customerAPI.getWishlist !== "function") {
+          throw new Error("Wishlist API is unavailable.");
+        }
+
+        const result = await customerAPI.getWishlist();
+        if (!mounted) return;
+        setList(Array.isArray(result?.data) ? result.data : []);
+      } catch (error) {
+        if (!mounted) return;
+        setLoadError(error?.message || "Failed to load wishlist.");
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    loadWishlist();
+    return () => { mounted = false; };
+  }, []);
+
+  const removeItem = async (productId) => {
+    const previous = list;
+    setList((curr) => curr.filter((x) => Number(x.product_id) !== Number(productId)));
+
+    try {
+      if (!customerAPI || typeof customerAPI.removeFromWishlist !== "function") {
+        throw new Error("Wishlist API is unavailable.");
+      }
+      await customerAPI.removeFromWishlist(productId);
+    } catch (error) {
+      setList(previous);
+      setLoadError(error?.message || "Failed to update wishlist.");
+    }
+  };
+
   return (
     <div className="section-content">
       <h3 className="section-title">Wishlist</h3>
+      {isLoading && <div style={EMPTY_STATE_STYLE}>Loading wishlist...</div>}
+      {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
+      {!isLoading && !loadError && list.length === 0 && <div style={EMPTY_STATE_STYLE}>Your wishlist is empty.</div>}
       <div className="wishlist-grid">
         {list.map((item) => (
-          <div key={item.id} className="wish-card">
-            <div className="wish-emoji">{item.emoji}</div>
+          <div key={item.wishlist_id || item.product_id} className="wish-card">
+            <div className="wish-emoji">❤️</div>
             <div className="wish-name">{item.name}</div>
-            <div className="wish-location">📍 {item.location}</div>
+            <div className="wish-location">📍 {item.location || "SouCul"}</div>
             <div className="wish-footer">
-              <span className="wish-price">₱{item.price.toLocaleString()}</span>
-              <button className="wish-remove" onClick={() => setList(l => l.filter(x => x.id !== item.id))}>✕</button>
+              <span className="wish-price">{formatPeso(item.price)}</span>
+              <button className="wish-remove" onClick={() => removeItem(item.product_id)}>✕</button>
             </div>
           </div>
         ))}
@@ -519,27 +612,100 @@ function WishlistSection() {
 }
 
 function AddressSection() {
-  const [addresses, setAddresses] = useState(mockAddresses);
+  const [addresses, setAddresses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const loadAddresses = async () => {
+    setIsLoading(true);
+    setLoadError("");
+
+    try {
+      if (!customerAPI || typeof customerAPI.getAddresses !== "function") {
+        throw new Error("Address API is unavailable.");
+      }
+
+      const result = await customerAPI.getAddresses();
+      setAddresses(Array.isArray(result?.data) ? result.data : []);
+    } catch (error) {
+      setLoadError(error?.message || "Failed to load addresses.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAddresses();
+  }, []);
+
+  const handleSetDefault = async (id) => {
+    try {
+      await customerAPI.updateAddress(id, { is_default: true });
+      await loadAddresses();
+    } catch (error) {
+      setLoadError(error?.message || "Failed to update default address.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await customerAPI.deleteAddress(id);
+      await loadAddresses();
+    } catch (error) {
+      setLoadError(error?.message || "Failed to delete address.");
+    }
+  };
+
+  const handleAddAddress = async () => {
+    const addressLine = window.prompt("Address line:");
+    if (!addressLine) return;
+
+    const city = window.prompt("City:");
+    if (!city) return;
+
+    const province = window.prompt("Province:");
+    if (!province) return;
+
+    const label = window.prompt("Label (Home/Office/Other):", "Home") || "Home";
+
+    try {
+      await customerAPI.addAddress({
+        label,
+        address_line: addressLine,
+        city,
+        province,
+      });
+      await loadAddresses();
+    } catch (error) {
+      setLoadError(error?.message || "Failed to add address.");
+    }
+  };
+
   return (
     <div className="section-content">
       <h3 className="section-title">Saved Addresses</h3>
+      {isLoading && <div style={EMPTY_STATE_STYLE}>Loading addresses...</div>}
+      {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
+      {!isLoading && !loadError && addresses.length === 0 && <div style={EMPTY_STATE_STYLE}>No saved addresses yet.</div>}
       <div className="address-list">
         {addresses.map((a) => (
-          <div key={a.id} className={`address-card${a.default ? " address-default" : ""}`}>
+          <div key={a.id} className={`address-card${Number(a.is_default) === 1 ? " address-default" : ""}`}>
             <div className="address-label-row">
-              <span className="address-label">{a.label}</span>
-              {a.default && <span className="default-badge">Default</span>}
+              <span className="address-label">{a.label || "Address"}</span>
+              {Number(a.is_default) === 1 && <span className="default-badge">Default</span>}
             </div>
-            <div className="address-text">{a.address}</div>
+            <div className="address-text">
+              {a.address_line}, {a.city}, {a.province}{a.postal_code ? ` ${a.postal_code}` : ""}
+            </div>
             <div className="address-actions">
-              {!a.default && (
-                <button className="addr-btn" onClick={() => setAddresses(list => list.map(x => ({ ...x, default: x.id === a.id })))}>Set as Default</button>
+              {Number(a.is_default) !== 1 && (
+                <button className="addr-btn" onClick={() => handleSetDefault(a.id)}>Set as Default</button>
               )}
-              <button className="addr-btn addr-btn-danger" onClick={() => setAddresses(l => l.filter(x => x.id !== a.id))}>Remove</button>
+              <button className="addr-btn addr-btn-danger" onClick={() => handleDelete(a.id)}>Remove</button>
             </div>
           </div>
         ))}
-        <button className="add-address-btn">+ Add New Address</button>
+        <button className="add-address-btn" onClick={handleAddAddress}>+ Add New Address</button>
       </div>
     </div>
   );
@@ -598,7 +764,69 @@ function PaymentSection() {
 }
 
 function NotificationsSection() {
-  const [settings, setSettings] = useState({ orders: true, promos: true, wishlist: false, newsletter: false, sms: true });
+  const defaultSettings = { orders: true, promos: true, wishlist: false, newsletter: false, sms: true };
+  const [settings, setSettings] = useState(defaultSettings);
+  const [isLoading, setIsLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState(null);
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSettings = async () => {
+      setIsLoading(true);
+      setSaveError("");
+
+      try {
+        if (!customerAPI || typeof customerAPI.getNotificationSettings !== "function") {
+          return;
+        }
+
+        const result = await customerAPI.getNotificationSettings();
+        if (!mounted) return;
+
+        if (result?.success && result.data) {
+          setSettings((prev) => ({ ...prev, ...result.data }));
+        }
+      } catch (error) {
+        if (!mounted) return;
+        setSaveError(error?.message || "Failed to load notification settings.");
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadSettings();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleToggle = async (key) => {
+    const nextValue = !settings[key];
+    const previousValue = settings[key];
+
+    setSettings((s) => ({ ...s, [key]: nextValue }));
+    setSavingKey(key);
+    setSaveError("");
+
+    try {
+      if (!customerAPI || typeof customerAPI.updateNotificationSettings !== "function") {
+        throw new Error("Notification settings API is unavailable.");
+      }
+
+      const result = await customerAPI.updateNotificationSettings({ [key]: nextValue });
+      if (result?.success && result.data) {
+        setSettings((prev) => ({ ...prev, ...result.data }));
+      }
+    } catch (error) {
+      setSettings((s) => ({ ...s, [key]: previousValue }));
+      setSaveError(error?.message || "Failed to update notification settings.");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
   const items = [
     { key: "orders", label: "Order Updates", desc: "Shipping, delivery & return status" },
     { key: "promos", label: "Promotions & Deals", desc: "Exclusive sales and discount codes" },
@@ -609,11 +837,16 @@ function NotificationsSection() {
   return (
     <div className="section-content">
       <h3 className="section-title">Notifications</h3>
+      {isLoading && <div className="notif-empty">Loading notification settings...</div>}
+      {saveError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{saveError}</div>}
       <div className="notif-list">
         {items.map(({ key, label, desc }) => (
           <div key={key} className="notif-row">
-            <div><div className="notif-label">{label}</div><div className="notif-desc">{desc}</div></div>
-            <div className={`toggle${settings[key] ? " on" : ""}`} onClick={() => setSettings(s => ({ ...s, [key]: !s[key] }))}>
+            <div>
+              <div className="notif-label">{label}</div>
+              <div className="notif-desc">{desc}{savingKey === key ? " (Saving...)" : ""}</div>
+            </div>
+            <div className={`toggle${settings[key] ? " on" : ""}`} onClick={() => handleToggle(key)}>
               <div className="toggle-thumb" />
             </div>
           </div>
@@ -738,20 +971,68 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
   const [photo, setPhoto] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [profileStats, setProfileStats] = useState({
+    totalOrders: 0,
+    wishlistItems: 0,
+    reviewsGiven: 0,
+    totalSpent: 0,
+  });
 
-  const user = userProfile;
+  const user = userProfile || { name: "Customer", email: "", phone: "", birthday: "", gender: "", createdAt: "" };
   const setUser = onUpdateProfile;
   const [draft, setDraft] = useState(user);
 
-  const initials = user.name.split(" ").map(n => n[0]).join("");
+  useEffect(() => {
+    setDraft(user);
+  }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadStats = async () => {
+      try {
+        const [ordersRes, wishlistRes] = await Promise.all([
+          customerAPI.getOrders ? customerAPI.getOrders() : Promise.resolve({ data: [] }),
+          customerAPI.getWishlist ? customerAPI.getWishlist() : Promise.resolve({ data: [] }),
+        ]);
+
+        if (!mounted) return;
+
+        const orders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+        const wishlist = Array.isArray(wishlistRes?.data) ? wishlistRes.data : [];
+        const totalSpent = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+
+        setProfileStats({
+          totalOrders: orders.length,
+          wishlistItems: wishlist.length,
+          reviewsGiven: 0,
+          totalSpent,
+        });
+      } catch {
+        if (!mounted) return;
+        setProfileStats((prev) => ({ ...prev }));
+      }
+    };
+
+    loadStats();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const initials = (user.name || "?").split(" ").filter(Boolean).map(n => n[0]).join("") || "?";
   
   const handleSave = async () => {
     setIsLoading(true);
     setSaveError(null);
     
     try {
-      const [firstName, ...lastNameParts] = draft.name.split(" ");
+      const [firstName, ...lastNameParts] = String(draft.name || "").trim().split(" ");
       const lastName = lastNameParts.join(" ");
+
+      if (!firstName) {
+        throw new Error("First name is required.");
+      }
       
       const updateData = {
         first_name: firstName,
@@ -764,7 +1045,16 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
       const result = await customerAPI.updateProfile(updateData);
       
       if (result.success) {
-        setUser(draft);
+        const p = result?.data || {};
+        const fullName = `${p.first_name || firstName} ${p.last_name || lastName}`.trim();
+        setUser({
+          name: fullName || draft.name,
+          email: p.email || draft.email,
+          phone: p.phone || "",
+          birthday: p.birthday || "",
+          gender: p.gender || "",
+          createdAt: p.created_at || user.createdAt || "",
+        });
         setEditMode(false);
       } else {
         setSaveError(result.message || "Failed to save profile. Please try again.");
@@ -804,15 +1094,16 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
             </select>
           </div>
         </div>
+        {saveError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{saveError}</div>}
         <div className="form-actions">
           <button className="btn-cancel" onClick={() => { setDraft(user); setEditMode(false); }}>Cancel</button>
-          <button className="btn-save" onClick={handleSave}>Save Changes</button>
+          <button className="btn-save" onClick={handleSave} disabled={isLoading}>{isLoading ? "Saving..." : "Save Changes"}</button>
         </div>
       </div>
     );
 
     switch (active) {
-      case "profile": return <ProfileDetailsSection user={user} photo={photo} onEdit={() => setEditMode(true)} onChangePhoto={() => setShowPhotoModal(true)} />;
+      case "profile": return <ProfileDetailsSection user={user} photo={photo} stats={profileStats} onEdit={() => setEditMode(true)} onChangePhoto={() => setShowPhotoModal(true)} />;
       case "orders": return <OrdersSection />;
       case "wishlist": return <WishlistSection />;
       case "addresses": return <AddressSection />;
@@ -1075,23 +1366,23 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         <div className="profile-banner">
           <div className="banner-title">SouCul — My Account</div>
-          <div className="banner-greeting">Welcome back, {user.name.split(" ")[0]} 👋</div>
+          <div className="banner-greeting">Welcome back, {(user.name || "Customer").split(" ")[0]} 👋</div>
         </div>
 
         <div className="avatar-card">
           <div className="avatar-inner">
             <div className="avatar-circle" onClick={() => setShowPhotoModal(true)}>
-              {photo ? <img src={photo} alt="avatar" /> : user.name.split(" ").map(n => n[0]).join("")}
+              {photo ? <img src={photo} alt="avatar" /> : initials}
               <div className="avatar-cam"><Icon d={icons.camera} size={12} /></div>
             </div>
             <div className="avatar-info">
-              <div className="avatar-name">{user.name}</div>
-              <div className="avatar-email">{user.email}</div>
+              <div className="avatar-name">{safeText(user.name, "Customer")}</div>
+              <div className="avatar-email">{safeText(user.email, "No email")}</div>
             </div>
             <div className="avatar-stats">
-              <div className="stat-item"><div className="stat-num">12</div><div className="stat-label">Orders</div></div>
-              <div className="stat-item"><div className="stat-num">3</div><div className="stat-label">Wishlist</div></div>
-              <div className="stat-item"><div className="stat-num">8</div><div className="stat-label">Reviews</div></div>
+              <div className="stat-item"><div className="stat-num">{profileStats.totalOrders}</div><div className="stat-label">Orders</div></div>
+              <div className="stat-item"><div className="stat-num">{profileStats.wishlistItems}</div><div className="stat-label">Wishlist</div></div>
+              <div className="stat-item"><div className="stat-num">{profileStats.reviewsGiven}</div><div className="stat-label">Reviews</div></div>
             </div>
           </div>
         </div>

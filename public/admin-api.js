@@ -11,10 +11,46 @@ const API_BASE_URL = (
   (isLocalVitePort ? '' : 'http://localhost:8000')
 ).replace(/\/+$/, '');
 
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
+function getCookie(name) {
+  const encodedName = `${encodeURIComponent(name)}=`;
+  const parts = document.cookie ? document.cookie.split(';') : [];
+
+  for (const part of parts) {
+    const cookie = part.trim();
+    if (cookie.startsWith(encodedName)) {
+      return decodeURIComponent(cookie.slice(encodedName.length));
+    }
+  }
+
+  return null;
+}
+
+function setCookie(name, value, maxAgeSeconds = COOKIE_MAX_AGE_SECONDS) {
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+}
+
+function removeCookie(name) {
+  document.cookie = `${encodeURIComponent(name)}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function getJsonCookie(name) {
+  const raw = getCookie(name);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 class AdminAPI {
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.token = localStorage.getItem('admin_token') || null;
+    this.token = getCookie('admin_token') || null;
   }
 
   // Helper for authenticated requests.
@@ -69,8 +105,8 @@ class AdminAPI {
 
     if (result.success && result.data.token) {
       this.token = result.data.token;
-      localStorage.setItem('admin_token', result.data.token);
-      localStorage.setItem('admin_user', JSON.stringify(result.data.admin));
+      setCookie('admin_token', result.data.token);
+      setCookie('admin_user', JSON.stringify(result.data.admin));
     }
 
     return result;
@@ -78,8 +114,8 @@ class AdminAPI {
 
   logout() {
     this.token = null;
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    removeCookie('admin_token');
+    removeCookie('admin_user');
   }
 
   async getProfile() {
@@ -88,6 +124,29 @@ class AdminAPI {
 
   async getHealth() {
     return await this.request('/health', { skipAuth: true });
+  }
+
+  // Notifications
+  async getNotifications(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const endpoint = `/api/v1/admin/notifications${queryString ? '?' + queryString : ''}`;
+    return await this.request(endpoint);
+  }
+
+  async getUnreadNotificationCount() {
+    return await this.request('/api/v1/admin/notifications/unread-count');
+  }
+
+  async markNotificationRead(notificationId) {
+    return await this.request(`/api/v1/admin/notifications/${notificationId}/read`, {
+      method: 'PATCH'
+    });
+  }
+
+  async markAllNotificationsRead() {
+    return await this.request('/api/v1/admin/notifications/read-all', {
+      method: 'PATCH'
+    });
   }
 
   // Dashboard
@@ -314,12 +373,7 @@ class AdminAPI {
   }
 
   getStoredAdmin() {
-    try {
-      const raw = localStorage.getItem('admin_user');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    return getJsonCookie('admin_user');
   }
 
 }

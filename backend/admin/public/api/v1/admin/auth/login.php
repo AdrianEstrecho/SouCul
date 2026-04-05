@@ -24,6 +24,14 @@ $token = jwtEncode([
 
 logAudit($db, $admin['id'], 'Login', 'System', 'Admin Login', "Admin {$admin['full_name']} logged in");
 
+createAdminNotification(
+    $db,
+    (int) $admin['id'],
+    'Login successful',
+    'You logged in to the admin dashboard.',
+    'login'
+);
+
 success([
     'token' => $token,
     'admin' => [

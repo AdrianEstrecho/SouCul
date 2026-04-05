@@ -243,5 +243,19 @@ if ($path === '/v1/admin/audit' && $method === 'GET') {
     require __DIR__ . '/api/v1/admin/audit/index.php';
 }
 
+// ── NOTIFICATIONS ───────────────────────────────────────────
+if ($path === '/v1/admin/notifications' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/notifications/index.php';
+}
+if ($path === '/v1/admin/notifications/unread-count' && $method === 'GET') {
+    require __DIR__ . '/api/v1/admin/notifications/unread_count.php';
+}
+if ($path === '/v1/admin/notifications/read-all' && $method === 'PATCH') {
+    require __DIR__ . '/api/v1/admin/notifications/mark_all_read.php';
+}
+if ($m = matchRoute('/v1/admin/notifications/:id/read', $path)) {
+    if ($method === 'PATCH') { $_route = $m; require __DIR__ . '/api/v1/admin/notifications/mark_read.php'; }
+}
+
 // ── 404 ────────────────────────────────────────────────────
 error("Route not found: $method $path", 404);

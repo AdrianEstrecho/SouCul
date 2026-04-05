@@ -101,6 +101,65 @@ function logAudit(PDO $db, int $adminId, string $action, string $entity, string 
     $stmt->execute([$adminId, $action, $entity, $entityName, $description, $_SERVER['REMOTE_ADDR'] ?? null]);
 }
 
+function notificationMetaJson(?array $meta): ?string {
+    if (!$meta) {
+        return null;
+    }
+
+    $encoded = json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return $encoded === false ? null : $encoded;
+}
+
+function createCustomerNotification(
+    PDO $db,
+    int $userId,
+    string $title,
+    string $message,
+    string $type = 'general',
+    ?array $meta = null
+): void {
+    try {
+        $stmt = $db->prepare(
+            "INSERT INTO customer_notifications (user_id, type, title, message, meta_json)
+             VALUES (?, ?, ?, ?, ?)"
+        );
+        $stmt->execute([
+            $userId,
+            substr(trim($type), 0, 50),
+            substr(trim($title), 0, 255),
+            trim($message),
+            notificationMetaJson($meta),
+        ]);
+    } catch (Throwable $e) {
+        error_log('createCustomerNotification failed: ' . $e->getMessage());
+    }
+}
+
+function createAdminNotification(
+    PDO $db,
+    int $adminId,
+    string $title,
+    string $message,
+    string $type = 'general',
+    ?array $meta = null
+): void {
+    try {
+        $stmt = $db->prepare(
+            "INSERT INTO admin_notifications (admin_id, type, title, message, meta_json)
+             VALUES (?, ?, ?, ?, ?)"
+        );
+        $stmt->execute([
+            $adminId,
+            substr(trim($type), 0, 50),
+            substr(trim($title), 0, 255),
+            trim($message),
+            notificationMetaJson($meta),
+        ]);
+    } catch (Throwable $e) {
+        error_log('createAdminNotification failed: ' . $e->getMessage());
+    }
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 function getPagination(): array {

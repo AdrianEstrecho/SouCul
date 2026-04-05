@@ -18,7 +18,7 @@ const PhilippinesMapBg = () => (
   </svg>
 );
 
-export default function Cart({ cartItems, onUpdateQty, onRemove, cartCount, onCartClick }) {
+export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove = () => {}, cartCount = 0, onCartClick }) {
   const navigate = useNavigate();
   const [checkedAll, setCheckedAll] = useState(false);
   const [voucher, setVoucher] = useState("");
@@ -73,7 +73,13 @@ export default function Cart({ cartItems, onUpdateQty, onRemove, cartCount, onCa
 
                 {/* Image */}
                 <div style={{ width: 80, height: 80, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: "#f3f4f6", color: "#64748b", fontSize: 24 }}>
+                      📦
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}

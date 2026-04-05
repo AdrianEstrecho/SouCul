@@ -101,3 +101,85 @@ INSERT IGNORE INTO categories (name, slug, is_active, display_order) VALUES
   ('Delicacies',   'delicacies',   1, 3),
   ('Decorations',  'decorations',  1, 4),
   ('Homeware',     'homeware',     1, 5);
+
+-- ── 8. NOTIFICATIONS ─────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS customer_notifications (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT NOT NULL,
+  type       VARCHAR(50) NOT NULL DEFAULT 'general',
+  title      VARCHAR(255) NOT NULL,
+  message    TEXT NOT NULL,
+  meta_json  JSON DEFAULT NULL,
+  is_read    TINYINT(1) NOT NULL DEFAULT 0,
+  read_at    TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_customer_notif_user_created (user_id, created_at),
+  INDEX idx_customer_notif_user_read (user_id, is_read)
+);
+
+CREATE TABLE IF NOT EXISTS admin_notifications (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+  admin_id   INT NOT NULL,
+  type       VARCHAR(50) NOT NULL DEFAULT 'general',
+  title      VARCHAR(255) NOT NULL,
+  message    TEXT NOT NULL,
+  meta_json  JSON DEFAULT NULL,
+  is_read    TINYINT(1) NOT NULL DEFAULT 0,
+  read_at    TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+  INDEX idx_admin_notif_admin_created (admin_id, created_at),
+  INDEX idx_admin_notif_admin_read (admin_id, is_read)
+);
+
+CREATE TABLE IF NOT EXISTS customer_notification_settings (
+  user_id          INT PRIMARY KEY,
+  order_updates    TINYINT(1) NOT NULL DEFAULT 1,
+  promotions       TINYINT(1) NOT NULL DEFAULT 1,
+  wishlist_alerts  TINYINT(1) NOT NULL DEFAULT 0,
+  newsletter       TINYINT(1) NOT NULL DEFAULT 0,
+  sms_notifications TINYINT(1) NOT NULL DEFAULT 1,
+  updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ── 9. CUSTOMER PROFILE + ACCOUNT DATA ─────────────────────────────────────
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS birthday DATE NULL AFTER phone,
+  ADD COLUMN IF NOT EXISTS gender VARCHAR(30) NULL AFTER birthday;
+
+CREATE TABLE IF NOT EXISTS customer_addresses (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT NOT NULL,
+  label         VARCHAR(50) NOT NULL DEFAULT 'Home',
+  address_line  VARCHAR(500) NOT NULL,
+  city          VARCHAR(120) NOT NULL,
+  province      VARCHAR(120) NOT NULL,
+  postal_code   VARCHAR(20) DEFAULT NULL,
+  phone         VARCHAR(20) DEFAULT NULL,
+  is_default    TINYINT(1) NOT NULL DEFAULT 0,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_customer_addresses_user (user_id),
+  INDEX idx_customer_addresses_default (user_id, is_default)
+);
+
+CREATE TABLE IF NOT EXISTS customer_wishlist (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NOT NULL,
+  product_id  INT NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_customer_wishlist (user_id, product_id),
+  INDEX idx_customer_wishlist_user_created (user_id, created_at)
+);

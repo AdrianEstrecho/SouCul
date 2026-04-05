@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(20),
+  birthday DATE,
+  gender VARCHAR(30),
   profile_image_url VARCHAR(500),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -160,7 +162,6 @@ CREATE TABLE IF NOT EXISTS payments (
   
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   INDEX idx_payment_status (payment_status)
-<<<<<<< HEAD
 );
 
 -- Audit Logs
@@ -180,6 +181,84 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   INDEX idx_entity (entity),
   INDEX idx_created_at (created_at)
 );
-=======
+
+-- Customer Notifications
+CREATE TABLE IF NOT EXISTS customer_notifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'general',
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  meta_json JSON DEFAULT NULL,
+  is_read BOOLEAN DEFAULT false,
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_customer_notifications_user (user_id),
+  INDEX idx_customer_notifications_unread (user_id, is_read),
+  INDEX idx_customer_notifications_created (created_at)
 );
->>>>>>> customer-api
+
+-- Admin Notifications
+CREATE TABLE IF NOT EXISTS admin_notifications (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  admin_id INT NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'general',
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  meta_json JSON DEFAULT NULL,
+  is_read BOOLEAN DEFAULT false,
+  read_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+  INDEX idx_admin_notifications_admin (admin_id),
+  INDEX idx_admin_notifications_unread (admin_id, is_read),
+  INDEX idx_admin_notifications_created (created_at)
+);
+
+-- Customer Notification Settings
+CREATE TABLE IF NOT EXISTS customer_notification_settings (
+  user_id INT PRIMARY KEY,
+  order_updates BOOLEAN DEFAULT true,
+  promotions BOOLEAN DEFAULT true,
+  wishlist_alerts BOOLEAN DEFAULT false,
+  newsletter BOOLEAN DEFAULT false,
+  sms_notifications BOOLEAN DEFAULT true,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Customer Addresses
+CREATE TABLE IF NOT EXISTS customer_addresses (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  label VARCHAR(50) NOT NULL DEFAULT 'Home',
+  address_line VARCHAR(500) NOT NULL,
+  city VARCHAR(120) NOT NULL,
+  province VARCHAR(120) NOT NULL,
+  postal_code VARCHAR(20),
+  phone VARCHAR(20),
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_customer_addresses_user (user_id),
+  INDEX idx_customer_addresses_default (user_id, is_default)
+);
+
+-- Customer Wishlist
+CREATE TABLE IF NOT EXISTS customer_wishlist (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  product_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_customer_wishlist (user_id, product_id),
+  INDEX idx_customer_wishlist_user_created (user_id, created_at)
+);

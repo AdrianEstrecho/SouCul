@@ -263,32 +263,101 @@ function showToast(msg) {
 }
 
 function addNotif(msg) {
-  state.notifications.unshift({ msg, time: new Date().toLocaleTimeString() });
+  state.notifications.unshift({ id: null, msg, time: new Date().toLocaleTimeString(), read: false });
   renderNotifs();
 }
 
+function formatNotifTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function normalizeAdminNotif(row) {
+  return {
+    id: Number(row.id || 0),
+    msg: row.title ? `${row.title}: ${row.message || ""}` : (row.message || ""),
+    time: formatNotifTime(row.created_at),
+    read: !!row.is_read,
+  };
+}
+
+async function refreshNotifs() {
+  if (!api.isAuthenticated()) {
+    state.notifications = [];
+    renderNotifs();
+    return;
+  }
+
+  try {
+    const res = await api.getNotifications({ limit: 30 });
+    state.notifications = (res.data || []).map(normalizeAdminNotif);
+    renderNotifs();
+  } catch (err) {
+    console.error("Notifications error:", err);
+  }
+}
+
+async function markNotifRead(id) {
+  const notifId = Number(id || 0);
+  if (!notifId) return;
+
+  state.notifications = state.notifications.map(n =>
+    Number(n.id) === notifId ? { ...n, read: true } : n
+  );
+  renderNotifs();
+
+  try {
+    await api.markNotificationRead(notifId);
+  } catch (err) {
+    console.error("Mark notification read error:", err);
+    await refreshNotifs();
+  }
+}
+
 function renderNotifs() {
-  const count = state.notifications.length;
+  const count = state.notifications.filter(n => !n.read).length;
+  const total = state.notifications.length;
   const countEl = document.getElementById("notif-count");
   const bodyEl = document.getElementById("notif-body");
   if (countEl) countEl.textContent = String(count);
   if (!bodyEl) return;
 
-  bodyEl.innerHTML = count
+  bodyEl.innerHTML = total
     ? state.notifications
-      .map(n => `<div class="notif-item"><div class="ni-label">${escapeHtml(n.msg)}</div><div class="ni-time">${escapeHtml(n.time)}</div></div>`)
+      .map(n => {
+        const unreadClass = n.read ? "" : " unread";
+        const onclick = n.id ? ` onclick="markNotifRead('${n.id}')"` : "";
+        return `<div class="notif-item${unreadClass}"${onclick}><div class="ni-label">${escapeHtml(n.msg)}</div><div class="ni-time">${escapeHtml(n.time)}</div></div>`;
+      })
       .join("")
     : '<div class="notif-empty">No notifications</div>';
 }
 
 function toggleNotif() {
   const panel = document.getElementById("notif-panel");
-  if (panel) panel.classList.toggle("open");
+  if (!panel) return;
+
+  const isOpen = panel.classList.toggle("open");
+  if (isOpen) {
+    refreshNotifs();
+  }
 }
 
-function clearNotifs() {
-  state.notifications = [];
+async function clearNotifs() {
+  if (api.isAuthenticated()) {
+    try {
+      await api.markAllNotificationsRead();
+    } catch (err) {
+      console.error("Clear notifications error:", err);
+      showToast(err.message || "Failed to update notifications");
+    }
+  }
+
+  state.notifications = state.notifications.map(n => ({ ...n, read: true }));
   renderNotifs();
+
   const panel = document.getElementById("notif-panel");
   if (panel) panel.classList.remove("open");
 }
@@ -387,7 +456,7 @@ async function doLogin() {
     showApp();
     await loadSecurity();
     await refreshAll();
-    addNotif("Logged in successfully");
+    await refreshNotifs();
   } catch (err) {
     showLoginError(err.message || "Login failed.");
   }
@@ -871,11 +940,11 @@ async function editProduct(id) {
 async function archiveProduct(id) {
   try {
     await api.archiveProduct(id);
-    addNotif("Product archived");
     showToast("Product archived");
     await renderProducts();
     await renderArchProducts();
     await renderDashboard();
+    await refreshNotifs();
   } catch (err) {
     console.error("Archive product error:", err);
     showToast(err.message || "Failed to archive product");
@@ -1026,6 +1095,7 @@ async function changeOrderStatusInline(id, newStatus) {
     showToast(`Order ${id} -> ${toTitleCase(status)}`);
     await renderOrders();
     await renderDashboard();
+    await refreshNotifs();
   } catch (err) {
     console.error("Change order status error:", err);
     showToast(err.message || "Failed to update order status");
@@ -1750,6 +1820,7 @@ async function bootstrapAuthenticatedApp() {
   showApp();
   await loadSecurity();
   await refreshAll();
+  await refreshNotifs();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

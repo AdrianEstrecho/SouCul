@@ -10,7 +10,7 @@ const formatExpiry = (v) => {
   return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d;
 };
 
-export default function Checkout({ cartItems, onRemove, cartCount, userProfile, directCheckoutItem, onClearDirectCheckout }) {
+export default function Checkout({ cartItems, onRemove, cartCount, userProfile, directCheckoutItem, onClearDirectCheckout, onOrderPlaced }) {
   const navigate = useNavigate();
   const isDirectCheckout = !!directCheckoutItem;
   const checkedItems = cartItems.filter((i) => i.checked);
@@ -65,6 +65,9 @@ const handlePlaceOrder = async (e) => {
       });
 
       if (result.success) {
+        if (typeof onOrderPlaced === "function") {
+          await onOrderPlaced();
+        }
         if (onClearDirectCheckout) onClearDirectCheckout();
         setPlaced(true);
       } else {

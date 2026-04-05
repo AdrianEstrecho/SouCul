@@ -75,22 +75,43 @@ npm install
 npm run dev
 ```
 
-Access at: `http://localhost:5173`
+Access at: `http://localhost:5173` (or the next available port, such as `5174`).
 
-If you are using the admin panel, run the backend API in a second terminal:
+### Local Dev Commands
+
+Run admin API only (port `8000`):
 
 ```bash
 npm run dev:api
 ```
 
-Or run both frontend + backend together:
+Run customer API only (port `8001`):
+
+```bash
+npm run dev:api:customer
+```
+
+Run both admin + customer APIs:
+
+```bash
+npm run dev:api:all
+```
+
+Run frontend + both APIs together:
 
 ```bash
 npm run dev:all
 ```
 
-The Vite proxy defaults to `http://127.0.0.1:8000`.
-You can override it with `VITE_ADMIN_PROXY_TARGET` in your `.env`.
+Vite proxy behavior in local dev:
+
+- `/api/*`, `/health`, and `/uploads/*` -> admin backend (`http://127.0.0.1:8000`)
+- `/api/v1/customer/*` -> customer backend (`http://127.0.0.1:8001`)
+
+You can override targets in `.env` using:
+
+- `VITE_ADMIN_PROXY_TARGET`
+- `VITE_CUSTOMER_PROXY_TARGET`
 
 ### Backend Setup (PHP + MySQL)
 
@@ -100,9 +121,13 @@ composer install
 copy .env.example .env
 # Edit .env with your database credentials
 php -S 127.0.0.1:8000 -t admin/public admin/public/index.php
+php -S 127.0.0.1:8001 -t customer/public customer/public/index.php
 ```
 
-Access at: `http://localhost:8000`
+Access at:
+
+- Admin API: `http://localhost:8000`
+- Customer API: `http://localhost:8001`
 
 **Complete backend setup guide:** [guides/BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md)
 

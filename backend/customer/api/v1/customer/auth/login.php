@@ -22,6 +22,14 @@ $token = jwtEncode([
     'email'   => $user['email'],
 ]);
 
+createCustomerNotification(
+    $db,
+    (int) $user['id'],
+    'Login detected',
+    'You logged in to your account successfully.',
+    'login'
+);
+
 success([
     'token' => $token,
     'user' => [
