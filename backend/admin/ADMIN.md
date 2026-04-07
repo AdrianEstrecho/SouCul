@@ -252,7 +252,7 @@ const response = await fetch('http://localhost:8000/api/v1/admin/orders/123/stat
 
 ### 1. Integrate with Admin Panel
 
-Update `public/admin.js` to call the backend API. Replace the local `state` object with API calls.
+Update `public/admin/admin.js` to call the backend API. Replace the local `state` object with API calls.
 
 Example for login:
 ```javascript

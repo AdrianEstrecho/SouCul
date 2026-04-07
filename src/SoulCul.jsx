@@ -75,7 +75,7 @@ export default function SoulCul() {
     const handleAdminShortcut = (e) => {
       if (e.ctrlKey && e.altKey && e.key === ".") {
         e.preventDefault();
-        window.location.href = "/admin.html";
+        window.location.href = "/admin/";
       }
     };
     window.addEventListener("keydown", handleAdminShortcut);

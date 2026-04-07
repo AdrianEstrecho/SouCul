@@ -25,10 +25,11 @@ SouCul/
 │   └── index.css
 ├── public/                         # Static assets shipped in frontend build
 │   ├── .htaccess                  # Apache SPA fallback
-│   ├── admin.html                 # Admin panel entry
-│   ├── admin.js                   # Admin app logic
-│   ├── admin-api.js               # Admin API client
-│   ├── admin.css
+│   ├── admin/                     # Admin panel static frontend
+│   │   ├── index.html             # Admin panel entry
+│   │   ├── admin.js               # Admin app logic
+│   │   ├── admin-api.js           # Admin API client
+│   │   └── admin.css
 │   ├── customer-api.js            # Customer API client
 │   ├── runtime-config.js          # Production runtime API endpoints
 │   └── assets/

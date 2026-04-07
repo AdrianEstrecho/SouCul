@@ -5,6 +5,7 @@ This guide is prepared for the current SouCul repository structure.
 ## 1) Target Production Topology
 
 - Main frontend: `https://yourdomain.com`
+- Admin frontend: `https://yourdomain.com/admin/`
 - Admin API: `https://api-admin.yourdomain.com`
 - Customer API: `https://api-customer.yourdomain.com`
 
@@ -33,9 +34,10 @@ Upload the **contents** of `dist/` into the main domain `public_html`.
 
 Important files included from this repo setup:
 - `runtime-config.js`
-- `admin.html`
-- `admin.js`
-- `admin-api.js`
+- `admin/index.html`
+- `admin/admin.js`
+- `admin/admin-api.js`
+- `admin/admin.css`
 - `customer-api.js`
 
 ## 5) Set Runtime API URLs (No Rebuild Needed)
@@ -120,7 +122,7 @@ Check these URLs:
 - `https://api-admin.yourdomain.com/health`
 - `https://api-customer.yourdomain.com/health`
 - `https://yourdomain.com`
-- `https://yourdomain.com/admin.html`
+- `https://yourdomain.com/admin/`
 
 Then test:
 

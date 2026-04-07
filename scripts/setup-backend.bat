@@ -160,7 +160,7 @@ echo 2. Test the API:
 echo    curl http://localhost:8000/health
 echo.
 echo 3. Login to admin panel:
-echo    URL: http://localhost:5173/admin.html (or your frontend URL)
+echo    URL: http://localhost:5173/admin/ (or your frontend URL)
 echo    Email: admin@soucul.com
 echo    Password: admin123
 echo.
