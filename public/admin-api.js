@@ -14,6 +14,9 @@ const API_BASE_URL = (
   (isLocalVitePort ? '' : window.location.origin)
 ).replace(/\/+$/, '');
 
+const API_CONFIG_ERROR_MESSAGE =
+  'Admin API returned an unexpected response. Check runtime-config.js adminApiBaseUrl and backend routing.';
+
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function getCookie(name) {
@@ -82,7 +85,22 @@ class AdminAPI {
         headers
       });
 
+      if (response.status === 204) {
+        return { success: true, data: null };
+      }
+
       const contentType = response.headers.get('content-type') || '';
+      const expectsJson = endpoint.startsWith('/api/') || endpoint.startsWith('/health');
+
+      if (expectsJson && !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        const compact = String(responseText || '').trim().slice(0, 120).toLowerCase();
+        if (compact.startsWith('<!doctype') || compact.startsWith('<html')) {
+          throw new Error(`${API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+        }
+        throw new Error(API_CONFIG_ERROR_MESSAGE);
+      }
+
       const data = contentType.includes('application/json')
         ? await response.json()
         : null;
@@ -106,10 +124,19 @@ class AdminAPI {
       skipAuth: true
     });
 
-    if (result.success && result.data.token) {
-      this.token = result.data.token;
-      setCookie('admin_token', result.data.token);
-      setCookie('admin_user', JSON.stringify(result.data.admin));
+    const token = result?.data?.token;
+    const admin = result?.data?.admin;
+
+    if (result?.success && token) {
+      this.token = token;
+      setCookie('admin_token', token);
+      if (admin) {
+        setCookie('admin_user', JSON.stringify(admin));
+      }
+    } else if (result?.success && !token) {
+      throw new Error(
+        'Login did not return an auth token. Verify runtime-config.js adminApiBaseUrl points to the admin backend.'
+      );
     }
 
     return result;

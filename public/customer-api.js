@@ -13,6 +13,9 @@ const CUSTOMER_API_BASE_URL = (
   (isLocalVitePort ? '' : window.location.origin)
 ).replace(/\/+$/, '');
 
+const CUSTOMER_API_CONFIG_ERROR_MESSAGE =
+  'Customer API returned an unexpected response. Check runtime-config.js customerApiBaseUrl and backend routing.';
+
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 function getCookie(name) {
@@ -61,13 +64,30 @@ class CustomerAPI {
         headers
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+      if (response.status === 204) {
+        return { success: true, data: null };
       }
 
-      return data;
+      const contentType = response.headers.get('content-type') || '';
+      const expectsJson = endpoint.startsWith('/api/') || endpoint.startsWith('/health');
+      if (expectsJson && !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        const compact = String(responseText || '').trim().slice(0, 120).toLowerCase();
+        if (compact.startsWith('<!doctype') || compact.startsWith('<html')) {
+          throw new Error(`${CUSTOMER_API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+        }
+        throw new Error(CUSTOMER_API_CONFIG_ERROR_MESSAGE);
+      }
+
+      const data = contentType.includes('application/json')
+        ? await response.json()
+        : null;
+
+      if (!response.ok) {
+        throw new Error((data && data.message) || `API request failed (${response.status})`);
+      }
+
+      return data || { success: true, data: null };
     } catch (error) {
       console.error('API Error:', error);
       throw error;
@@ -90,10 +110,19 @@ class CustomerAPI {
       skipAuth: true
     });
 
-    if (result.success && result.data.token) {
-      this.token = result.data.token;
-      setCookie('customer_token', result.data.token);
-      setCookie('customer_user', JSON.stringify(result.data.user));
+    const token = result?.data?.token;
+    const user = result?.data?.user;
+
+    if (result?.success && token) {
+      this.token = token;
+      setCookie('customer_token', token);
+      if (user) {
+        setCookie('customer_user', JSON.stringify(user));
+      }
+    } else if (result?.success && !token) {
+      throw new Error(
+        'Login did not return an auth token. Verify runtime-config.js customerApiBaseUrl points to the customer backend.'
+      );
     }
 
     return result;

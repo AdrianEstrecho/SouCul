@@ -1817,7 +1817,7 @@ async function bootstrapAuthenticatedApp() {
   if (!isDatabaseConnected) {
     api.logout();
     showLoginScreen();
-    showLoginError("Backend API is offline. Start PHP server on 127.0.0.1:8000.");
+    showLoginError("Backend API is offline or misconfigured. Check runtime-config.js and /health endpoint.");
     return;
   }
 
