@@ -54,6 +54,11 @@ if ($m = matchRoute('/v1/customer/products/:id', $path)) {
     if ($method === 'GET') { $_route = $m; require __DIR__ . '/../api/v1/customer/products/show.php'; }
 }
 
+// ── LOCATIONS ──────────────────────────────────────────────
+if ($path === '/v1/customer/locations' && $method === 'GET') {
+    require __DIR__ . '/../api/v1/customer/locations/index.php';
+}
+
 // ── ORDERS ─────────────────────────────────────────────────
 if ($path === '/v1/customer/orders' && $method === 'GET') {
     require __DIR__ . '/../api/v1/customer/orders/index.php';

@@ -51,6 +51,9 @@ function ProductModal({ product, onClose, onAddToCart, onCheckoutProduct }) {
   const [added, setAdded] = useState(false);
   const [qty, setQty] = useState(1);
   const details = productDetails[product.id] || productDetails.default;
+  const productDescription = product.description || details.description;
+  const stockCount = Math.max(0, Number(product.stock ?? details.stock ?? 0));
+  const maxQty = Math.max(1, stockCount || 1);
   const price = `₱${product.price.toLocaleString()}`;
   const totalPrice = `₱${(product.price * qty).toLocaleString()}`;
 
@@ -91,7 +94,7 @@ function ProductModal({ product, onClose, onAddToCart, onCheckoutProduct }) {
               <span className="modal-rating-score">{details.rating}</span>
               <span className="modal-review-count">({details.reviews} reviews)</span>
             </div>
-            <p className="modal-description">{details.description}</p>
+            <p className="modal-description">{productDescription}</p>
             <div className="modal-info-grid">
               <div className="modal-info-item">
                 <span className="modal-info-label">Seller</span>
@@ -103,7 +106,7 @@ function ProductModal({ product, onClose, onAddToCart, onCheckoutProduct }) {
               </div>
               <div className="modal-info-item">
                 <span className="modal-info-label">Stock</span>
-                <span className="modal-info-value">{details.stock} left</span>
+                <span className="modal-info-value">{stockCount} left</span>
               </div>
               <div className="modal-info-item">
                 <span className="modal-info-label">Origin</span>
@@ -119,7 +122,7 @@ function ProductModal({ product, onClose, onAddToCart, onCheckoutProduct }) {
               <div className="modal-qty-controls">
                 <button type="button" className="modal-qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))}>−</button>
                 <span className="modal-qty-value">{qty}</span>
-                <button type="button" className="modal-qty-btn" onClick={() => setQty(q => Math.min(details.stock, q + 1))}>+</button>
+                <button type="button" className="modal-qty-btn" onClick={() => setQty(q => Math.min(maxQty, q + 1))}>+</button>
               </div>
             </div>
             <div className="modal-footer">

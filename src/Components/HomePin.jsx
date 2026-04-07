@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 
@@ -15,62 +15,142 @@ import tagaytayImg from "../assets/tagaytay.png";
 import boracayImg from "../assets/boracay.png";
 import boholImg from "../assets/bohol.png";
 
-const LOCATIONS = [
-  {
-    id: 1, left: "43%", top: "25%",
-    name: "Vigan",
-    description: "Is a historic city in the province of Ilocos Sur, located in the northern part of Philippines. It is famous for its well-preserved Spanish colonial architecture, especially along Calle Crisologo. Vigan is recognized as a UNESCO World Heritage Site for its unique blend of Asian and Spanish cultural influences.",
+const LOCATION_META_BY_SLUG = {
+  vigan: {
+    left: "43%",
+    top: "25%",
+    description:
+      "Is a historic city in the province of Ilocos Sur, located in the northern part of Philippines. It is famous for its well-preserved Spanish colonial architecture, especially along Calle Crisologo. Vigan is recognized as a UNESCO World Heritage Site for its unique blend of Asian and Spanish cultural influences.",
     image: viganImg,
-    zoomScale: 2.5, zoomX: "35%", zoomY: "25%",
-    route: "/Vigan/Clothes",
+    zoomScale: 2.5,
+    zoomX: "35%",
+    zoomY: "25%",
   },
-  {
-    id: 2, left: "42%", top: "32%",
-    name: "Baguio",
-    description: 'Baguio City, known as the "Summer Capital of the Philippines," is a cool mountain destination famous for its pine trees, scenic views, and vibrant culture. Visitors are welcomed by the iconic Lion\'s Head along Kennon Road and can explore popular spots like Burnham Park, Mines View Park, and Camp John Hay.',
+  baguio: {
+    left: "42%",
+    top: "32%",
+    description:
+      'Baguio City, known as the "Summer Capital of the Philippines," is a cool mountain destination famous for its pine trees, scenic views, and vibrant culture. Visitors are welcomed by the iconic Lion\'s Head along Kennon Road and can explore popular spots like Burnham Park, Mines View Park, and Camp John Hay.',
     image: baguioImg,
-    zoomScale: 2.5, zoomX: "38%", zoomY: "30%",
-    route: "/Baguio/Clothes",
+    zoomScale: 2.5,
+    zoomX: "38%",
+    zoomY: "30%",
   },
-  {
-    id: 3, left: "44%", top: "43%",
-    name: "Tagaytay",
-    description: "Tagaytay is the Philippines' favorite cool-weather escape. Located just south of Manila, it offers a refreshing break from the tropical heat and some of the most iconic landscapes in the country.",
+  tagaytay: {
+    left: "44%",
+    top: "43%",
+    description:
+      "Tagaytay is the Philippines' favorite cool-weather escape. Located just south of Manila, it offers a refreshing break from the tropical heat and some of the most iconic landscapes in the country.",
     image: tagaytayImg,
-    zoomScale: 2.5, zoomX: "38%", zoomY: "40%",
-    route: "/Tagaytay/Clothes",
+    zoomScale: 2.5,
+    zoomX: "38%",
+    zoomY: "40%",
   },
-  {
-    id: 4, left: "50%", top: "66%",
-    name: "Boracay",
-    description: "Boracay is a popular vacation spot, and well-known for its white-powder beaches, crystal-blue waters and vibrant, exotic atmosphere. Nature-lovers who enjoy hiking will also appreciate the island's tropical, hilly landscape, which is populated by a variety of species of wildlife.",
+  boracay: {
+    left: "50%",
+    top: "66%",
+    description:
+      "Boracay is a popular vacation spot, and well-known for its white-powder beaches, crystal-blue waters and vibrant, exotic atmosphere. Nature-lovers who enjoy hiking will also appreciate the island's tropical, hilly landscape, which is populated by a variety of species of wildlife.",
     image: boracayImg,
-    zoomScale: 2.5, zoomX: "43%", zoomY: "50%",
-    route: "/Boracay/Clothes",
+    zoomScale: 2.5,
+    zoomX: "43%",
+    zoomY: "50%",
   },
-  {
-    id: 5, left: "60%", top: "74%",
-    name: "Bohol",
-    description: "Bohol is a scenic island province in the Philippines known for its world-famous Chocolate Hills, crystal-clear waters, and rich marine life. It's also home to the tiny tarsier, centuries-old Spanish churches, and beautiful white-sand beaches like Panglao, making it a perfect mix of nature, history, and relaxation.",
+  bohol: {
+    left: "60%",
+    top: "74%",
+    description:
+      "Bohol is a scenic island province in the Philippines known for its world-famous Chocolate Hills, crystal-clear waters, and rich marine life. It's also home to the tiny tarsier, centuries-old Spanish churches, and beautiful white-sand beaches like Panglao, making it a perfect mix of nature, history, and relaxation.",
     image: boholImg,
-    zoomScale: 2.5, zoomX: "50%", zoomY: "60%",
-    route: "/Bohol/Clothes",
+    zoomScale: 2.5,
+    zoomX: "50%",
+    zoomY: "60%",
   },
-];
+};
+
+function mapLocation(row, index) {
+  const fallbackLeft = `${45 + ((index % 5) - 2) * 3}%`;
+  const fallbackTop = `${45 + Math.floor(index / 5) * 7}%`;
+  const slug = String(row?.slug || "").toLowerCase();
+  const meta = LOCATION_META_BY_SLUG[slug] || {};
+  const name = row?.name || slug;
+  const region = row?.region ? `, ${row.region}` : "";
+  const province = row?.province || "the Philippines";
+
+  return {
+    id: Number(row.id),
+    slug,
+    name,
+    left: meta.left || fallbackLeft,
+    top: meta.top || fallbackTop,
+    description: meta.description || `${name} is located in ${province}${region}.`,
+    image: meta.image || mapImg,
+    zoomScale: Number(meta.zoomScale || 2.5),
+    zoomX: meta.zoomX || "center",
+    zoomY: meta.zoomY || "center",
+    route: `/${name}/Clothes`,
+  };
+}
 
 export default function HomePin({ cartCount }) {
   const [selectedId, setSelectedId] = useState(null);
   const [panelKey, setPanelKey] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
+  const [locationError, setLocationError] = useState("");
   const panelRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadLocations = async () => {
+      setIsLoadingLocations(true);
+      setLocationError("");
+
+      try {
+        const api = window.CustomerAPI || window.customerAPI;
+        if (!api || typeof api.getLocations !== "function") {
+          throw new Error("Customer API client is unavailable.");
+        }
+
+        const response = await api.getLocations();
+        const rows = Array.isArray(response?.data) ? response.data : [];
+        const mappedLocations = rows.map((row, index) => mapLocation(row, index));
+
+        if (isMounted) {
+          setLocations(mappedLocations);
+        }
+      } catch (error) {
+        console.error("Failed to load locations from database:", error);
+        if (isMounted) {
+          setLocations([]);
+          setLocationError("Unable to load locations from the database right now.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingLocations(false);
+        }
+      }
+    };
+
+    loadLocations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleGoHome = () => {
     setLeaving(true);
     setTimeout(() => navigate("/"), 600);
   };
 
-  const selectedLoc = LOCATIONS.find((l) => l.id === selectedId);
+  const selectedLoc = useMemo(
+    () => locations.find((location) => location.id === selectedId) || null,
+    [locations, selectedId]
+  );
 
   const zoomStyle = selectedLoc
     ? {
@@ -101,7 +181,7 @@ export default function HomePin({ cartCount }) {
         <img src={cloud4} alt="" className="homepin-cloud homepin-cloud-4" />
 
         <div className="homepin-pin-container">
-          {LOCATIONS.map((loc) => (
+          {locations.map((loc) => (
             <button
               key={loc.id}
               className={`homepin-pin-btn${selectedId === loc.id ? " active-pin" : ""}${selectedId && selectedId !== loc.id ? " zoomed-mode" : ""}`}
@@ -114,6 +194,24 @@ export default function HomePin({ cartCount }) {
           ))}
         </div>
       </div>
+
+      {isLoadingLocations && (
+        <div style={{ textAlign: "center", padding: "12px 16px", color: "#5c5c5c", fontWeight: 600 }}>
+          Loading locations from database...
+        </div>
+      )}
+
+      {!isLoadingLocations && locationError && (
+        <div style={{ textAlign: "center", padding: "12px 16px", color: "#b3261e", fontWeight: 600 }}>
+          {locationError}
+        </div>
+      )}
+
+      {!isLoadingLocations && !locationError && locations.length === 0 && (
+        <div style={{ textAlign: "center", padding: "12px 16px", color: "#5c5c5c", fontWeight: 600 }}>
+          No locations found.
+        </div>
+      )}
 
       {selectedLoc && (
         <div
