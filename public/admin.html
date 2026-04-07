@@ -72,7 +72,7 @@
       <div class="nav-item" onclick="switchPanel('security',this)"><span class="icon"><i class="fa-solid fa-gear"></i></span>Security &amp; Settings</div>
     </nav>
     <div class="sidebar-footer">
-      <div class="db-status"><span class="db-dot"></span>Database: Connected</div>
+      <div class="db-status" id="db-status"><span class="db-dot checking" id="db-dot"></span><span id="db-status-text">Database: Checking...</span></div>
       <button class="btn-logout" onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
     </div>
   </aside>
@@ -93,7 +93,7 @@
           <div class="notif-panel" id="notif-panel">
             <div class="notif-header">
               <h4>Notifications</h4>
-              <button class="notif-clear" onclick="clearNotifs()">Clear all</button>
+              <button class="notif-clear" onclick="clearNotifs()">Mark all read</button>
             </div>
             <div class="notif-body" id="notif-body">
               <div class="notif-empty">No notifications</div>
@@ -116,30 +116,26 @@
           <div class="stat-card"><div class="label">Low Stock Alert</div><div class="value" id="stat-lowstock">0</div><div class="sub">items need reorder</div><div class="icon-bg"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
         </div>
         <div class="dash-grid">
-          <div class="dash-card dash-card-fixed">
-            <div class="dash-card-header"><i class="fa-solid fa-chart-pie"></i>Products by Category</div>
-            <div class="dash-card-body" id="cat-breakdown"></div>
+          <div class="dash-card">
+            <h3>Products by Category</h3>
+            <div id="cat-breakdown"></div>
           </div>
-          <div class="dash-card dash-card-fixed">
-            <div class="dash-card-header"><i class="fa-solid fa-list-check"></i>Orders by Status</div>
-            <div class="dash-card-body" id="order-status-breakdown"></div>
+          <div class="dash-card">
+            <h3>Orders by Status</h3>
+            <div class="order-status-row" id="order-status-breakdown"></div>
           </div>
-          <div class="dash-card dash-card-fixed">
-            <div class="dash-card-header"><i class="fa-solid fa-trophy"></i>Top Selling Products</div>
-            <div class="dash-card-body">
-              <table class="dash-table"><thead><tr><th>#</th><th>Product</th><th>Sold</th></tr></thead><tbody id="top-selling"></tbody></table>
-            </div>
+          <div class="dash-card">
+            <h3>Top Selling Products</h3>
+            <div class="table-wrap" style="margin:0"><table><thead><tr><th>#</th><th>Title</th><th>Sold</th></tr></thead><tbody id="top-selling"></tbody></table></div>
           </div>
-          <div class="dash-card dash-card-fixed">
-            <div class="dash-card-header"><i class="fa-solid fa-triangle-exclamation"></i>Inventory Alerts</div>
-            <div class="dash-card-body">
-              <table class="dash-table"><thead><tr><th>Product</th><th>Stock</th><th>Status</th></tr></thead><tbody id="inv-alerts"></tbody></table>
-            </div>
+          <div class="dash-card">
+            <h3>Inventory Alerts</h3>
+            <div class="table-wrap" style="margin:0"><table><thead><tr><th>Product</th><th>Stock</th><th>Status</th></tr></thead><tbody id="inv-alerts"></tbody></table></div>
           </div>
         </div>
-        <div class="dash-card dash-card-fixed" style="margin-top:20px">
-          <div class="dash-card-header"><i class="fa-solid fa-clock-rotate-left"></i>Recent Activity</div>
-          <div class="dash-card-body" id="activity-log"><div style="color:var(--text-muted);font-size:13px">No recent activity</div></div>
+        <div class="dash-card" style="margin-top:20px">
+          <h3>Recent Activity</h3>
+          <div id="activity-log"><div style="color:var(--text-muted);font-size:13px">No recent activity</div></div>
         </div>
       </div>
 
@@ -170,7 +166,7 @@
             <tbody id="products-tbody"></tbody>
           </table>
           <div class="table-footer" id="products-footer">Showing 0 products</div>
-          <div class="pagination-bar" id="products-pagination"></div>
+          <div class="table-pagination" id="products-pagination"></div>
         </div>
       </div>
 
@@ -181,11 +177,11 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Username</th><th>Email</th><th>Password</th><th>Role</th><th>Actions</th></tr></thead>
+            <thead><tr><th>First Name</th><th>Last Name</th><th>Email</th><th>Password</th><th>Role</th><th>Actions</th></tr></thead>
             <tbody id="users-tbody"></tbody>
           </table>
           <div class="table-footer" id="users-footer">Showing 0 users</div>
-          <div class="pagination-bar" id="users-pagination"></div>
+          <div class="table-pagination" id="users-pagination"></div>
         </div>
       </div>
 
@@ -208,7 +204,7 @@
             <tbody id="orders-tbody"></tbody>
           </table>
           <div class="table-footer" id="orders-footer">Showing 0 orders</div>
-          <div class="pagination-bar" id="orders-pagination"></div>
+          <div class="table-pagination" id="orders-pagination"></div>
         </div>
       </div>
 
@@ -224,7 +220,7 @@
             <tbody id="vouchers-tbody"></tbody>
           </table>
           <div class="table-footer" id="vouchers-footer">Showing 0 vouchers</div>
-          <div class="pagination-bar" id="vouchers-pagination"></div>
+          <div class="table-pagination" id="vouchers-pagination"></div>
         </div>
       </div>
 
@@ -238,7 +234,8 @@
             <thead><tr><th>Cover</th><th>Name</th><th>Category</th><th>Stock</th><th>Actions</th></tr></thead>
           <tbody id="arch-products-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No archived products</td></tr></tbody>
           </table>
-          <div class="pagination-bar" id="arch-products-pagination"></div>
+          <div class="table-footer" id="arch-products-footer">Showing 0 archived products</div>
+          <div class="table-pagination" id="arch-products-pagination"></div>
         </div>
       </div>
 
@@ -252,7 +249,8 @@
             <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
             <tbody id="arch-users-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">No archived users</td></tr></tbody>
           </table>
-          <div class="pagination-bar" id="arch-users-pagination"></div>
+          <div class="table-footer" id="arch-users-footer">Showing 0 archived users</div>
+          <div class="table-pagination" id="arch-users-pagination"></div>
         </div>
       </div>
 
@@ -266,7 +264,8 @@
             <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
             <tbody id="arch-orders-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No archived orders</td></tr></tbody>
           </table>
-          <div class="pagination-bar" id="arch-orders-pagination"></div>
+          <div class="table-footer" id="arch-orders-footer">Showing 0 archived orders</div>
+          <div class="table-pagination" id="arch-orders-pagination"></div>
         </div>
       </div>
 
@@ -282,7 +281,7 @@
             <tbody id="admins-tbody"></tbody>
           </table>
           <div class="table-footer" id="admins-footer">Showing 0 admins</div>
-          <div class="pagination-bar" id="admins-pagination"></div>
+          <div class="table-pagination" id="admins-pagination"></div>
         </div>
       </div>
 
@@ -305,7 +304,7 @@
             <tbody id="audit-tbody"></tbody>
           </table>
           <div class="table-footer" id="audit-footer">Showing 0 logs</div>
-          <div class="pagination-bar" id="audit-pagination"></div>
+          <div class="table-pagination" id="audit-pagination"></div>
         </div>
       </div>
 
@@ -422,7 +421,11 @@
           <div class="img-upload-hint">Accepted: JPG, PNG, WebP, GIF (Max 5MB)</div>
         </div>
         <div class="img-upload-preview" id="img-upload-preview" style="display:none">
-          <img id="p-image-preview" src="" alt="Preview" />
+          <img id="p-image-preview" src="" alt="Product preview" />
+          <div class="img-upload-meta">
+            <div class="img-upload-name" id="p-image-name">No image selected</div>
+            <div class="img-upload-dim" id="p-image-dim">-</div>
+          </div>
           <button class="img-upload-remove" onclick="event.stopPropagation();clearProductImage()" title="Remove image">
             <i class="fa-solid fa-xmark"></i>
           </button>
@@ -562,6 +565,11 @@
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- Runtime environment config (set in public/runtime-config.js) -->
+<script src="runtime-config.js"></script>
+<!-- API Service Layer -->
+<script src="admin-api.js"></script>
+<!-- Admin Application -->
 <script src="admin.js"></script>
 
 </body>

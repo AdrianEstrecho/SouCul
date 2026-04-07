@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { getCookie } from "../utils/cookieState";
 
 const SearchIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="White" strokeWidth="2">
@@ -30,21 +31,16 @@ const BellIcon = ({ size = 22 }) => (
 export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const [showGuestMsg, setShowGuestMsg] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState(() => {
-    const currentUser = localStorage.getItem("soulcul_currentUser");
-    if (currentUser && currentUser !== "guest") {
-      const stored = localStorage.getItem(`soulcul_notifications_${currentUser}`);
-      if (stored) return JSON.parse(stored);
-    }
-    return [];
-  });
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef(null);
-  const isGuest = localStorage.getItem("soulcul_currentUser") === "guest";
-  const isLoggedIn = localStorage.getItem("soulcul_loggedIn") === "true";
+  const isGuest = getCookie("soulcul_currentUser") === "guest";
+  const isLoggedIn = getCookie("soulcul_loggedIn") === "true" || !!getCookie("customer_token");
   const navigate = useNavigate();
   const location = useLocation();
   const getActiveNav = () => {
-    if (location.pathname === "/" || location.pathname === "/Map") return "Home";
+    if (location.pathname === "/") return "Home";
+    if (location.pathname === "/Map") return "Products";
     if (location.pathname === "/AboutUs") return "About Us";
     if (location.pathname === "/Profile" || location.pathname === "/Cart" || location.pathname === "/Checkout") return null;
     return "Products";
@@ -76,24 +72,95 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const saveNotifications = (updated) => {
-    const currentUser = localStorage.getItem("soulcul_currentUser");
-    if (currentUser && currentUser !== "guest") {
-      localStorage.setItem(`soulcul_notifications_${currentUser}`, JSON.stringify(updated));
+  const formatNotificationTime = (value) => {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const loadNotifications = async () => {
+    if (!isLoggedIn || isGuest) {
+      setNotifications([]);
+      return;
+    }
+
+    const api = window.CustomerAPI;
+    if (!api || typeof api.getNotifications !== "function") {
+      setNotifications([]);
+      return;
+    }
+
+    setNotifLoading(true);
+    try {
+      const response = await api.getNotifications({ limit: 20 });
+      const rows = Array.isArray(response?.data) ? response.data : [];
+
+      const mapped = rows.map((row) => ({
+        id: row.id,
+        text: row.title ? `${row.title}: ${row.message}` : row.message,
+        time: formatNotificationTime(row.created_at),
+        read: Boolean(row.is_read),
+      }));
+
+      setNotifications(mapped);
+    } catch (error) {
+      console.error("Failed to load notifications:", error);
+    } finally {
+      setNotifLoading(false);
     }
   };
 
-  const markAsRead = (id) => {
+  const markAsRead = async (id) => {
     const updated = notifications.map((n) => n.id === id ? { ...n, read: true } : n);
     setNotifications(updated);
-    saveNotifications(updated);
+
+    const api = window.CustomerAPI;
+    if (!api || typeof api.markNotificationRead !== "function") {
+      return;
+    }
+
+    try {
+      await api.markNotificationRead(id);
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error);
+      await loadNotifications();
+    }
   };
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
     setNotifications(updated);
-    saveNotifications(updated);
+
+    const api = window.CustomerAPI;
+    if (!api || typeof api.markAllNotificationsRead !== "function") {
+      return;
+    }
+
+    try {
+      await api.markAllNotificationsRead();
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+      await loadNotifications();
+    }
   };
+
+  useEffect(() => {
+    if (isLoggedIn && !isGuest) {
+      loadNotifications();
+    } else {
+      setNotifications([]);
+    }
+  }, [isLoggedIn, isGuest]);
 
   // Close notification dropdown on outside click
   useEffect(() => {
@@ -170,7 +237,13 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
         <div className="icon-pill notif-pill" ref={notifRef}>
           <button className="icon-btn notif-btn" onClick={() => {
             if (!isLoggedIn || isGuest) { setShowGuestMsg(true); setTimeout(() => setShowGuestMsg(false), 3000); return; }
-            setNotifOpen((prev) => !prev);
+            setNotifOpen((prev) => {
+              const next = !prev;
+              if (next) {
+                loadNotifications();
+              }
+              return next;
+            });
           }}>
             <BellIcon size={22} />
             {isLoggedIn && !isGuest && unreadCount > 0 && (
@@ -187,7 +260,9 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
                 )}
               </div>
               <div className="notif-list">
-                {notifications.length === 0 ? (
+                {notifLoading ? (
+                  <div className="notif-empty">Loading notifications...</div>
+                ) : notifications.length === 0 ? (
                   <div className="notif-empty">No notifications yet</div>
                 ) : (
                   notifications.map((n) => (
