@@ -68,6 +68,14 @@ const LOCATION_META_BY_SLUG = {
   },
 };
 
+const FALLBACK_LOCATION_ROWS = [
+  { id: 1, name: "Vigan", slug: "vigan", region: "Ilocos Region", province: "Ilocos Sur" },
+  { id: 2, name: "Baguio", slug: "baguio", region: "Cordillera Administrative Region", province: "Benguet" },
+  { id: 3, name: "Boracay", slug: "boracay", region: "Western Visayas", province: "Aklan" },
+  { id: 4, name: "Tagaytay", slug: "tagaytay", region: "Calabarzon", province: "Cavite" },
+  { id: 5, name: "Bohol", slug: "bohol", region: "Central Visayas", province: "Bohol" },
+];
+
 function mapLocation(row, index) {
   const fallbackLeft = `${45 + ((index % 5) - 2) * 3}%`;
   const fallbackTop = `${45 + Math.floor(index / 5) * 7}%`;
@@ -102,6 +110,13 @@ export default function HomePin({ cartCount }) {
   const panelRef = useRef(null);
   const navigate = useNavigate();
 
+  const fallbackLocations = useMemo(
+    () => FALLBACK_LOCATION_ROWS.map((row, index) => mapLocation(row, index)),
+    []
+  );
+
+  const visibleLocations = locations.length > 0 ? locations : fallbackLocations;
+
   useEffect(() => {
     let isMounted = true;
 
@@ -125,7 +140,7 @@ export default function HomePin({ cartCount }) {
       } catch (error) {
         console.error("Failed to load locations from database:", error);
         if (isMounted) {
-          setLocations([]);
+          // Keep fallback pins visible if API data cannot be loaded.
           setLocationError("Unable to load locations from the database right now.");
         }
       } finally {
@@ -148,8 +163,8 @@ export default function HomePin({ cartCount }) {
   };
 
   const selectedLoc = useMemo(
-    () => locations.find((location) => location.id === selectedId) || null,
-    [locations, selectedId]
+    () => visibleLocations.find((location) => location.id === selectedId) || null,
+    [selectedId, visibleLocations]
   );
 
   const zoomStyle = selectedLoc
@@ -181,7 +196,7 @@ export default function HomePin({ cartCount }) {
         <img src={cloud4} alt="" className="homepin-cloud homepin-cloud-4" />
 
         <div className="homepin-pin-container">
-          {locations.map((loc) => (
+          {visibleLocations.map((loc) => (
             <button
               key={loc.id}
               className={`homepin-pin-btn${selectedId === loc.id ? " active-pin" : ""}${selectedId && selectedId !== loc.id ? " zoomed-mode" : ""}`}
@@ -207,7 +222,7 @@ export default function HomePin({ cartCount }) {
         </div>
       )}
 
-      {!isLoadingLocations && !locationError && locations.length === 0 && (
+      {!isLoadingLocations && !locationError && visibleLocations.length === 0 && (
         <div style={{ textAlign: "center", padding: "12px 16px", color: "#5c5c5c", fontWeight: 600 }}>
           No locations found.
         </div>
