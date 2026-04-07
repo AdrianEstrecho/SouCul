@@ -1,6 +1,16 @@
 RewriteEngine On
 DirectoryIndex index.html
 
+# Single-domain fallback routing (no subdomains):
+# - /api/v1/admin/* -> backend/admin/public/index.php
+# - /api/v1/customer/* -> backend/customer/public/index.php
+# - /health -> admin health endpoint
+# - /uploads/products/* -> admin upload/static handler
+RewriteRule ^api/v1/admin(/.*)?$ backend/admin/public/index.php [QSA,L]
+RewriteRule ^api/v1/customer(/.*)?$ backend/customer/public/index.php [QSA,L]
+RewriteRule ^health$ backend/admin/public/index.php [QSA,L]
+RewriteRule ^uploads/products/.*$ backend/admin/public/index.php [QSA,L]
+
 # Keep real files and directories accessible.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

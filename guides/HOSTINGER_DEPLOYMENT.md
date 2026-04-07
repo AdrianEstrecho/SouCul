@@ -9,6 +9,13 @@ This guide is prepared for the current SouCul repository structure.
 - Admin API: `https://api-admin.yourdomain.com`
 - Customer API: `https://api-customer.yourdomain.com`
 
+If your Hostinger plan/UI does not offer subdomains, use this single-domain fallback:
+
+- Main frontend: `https://yourdomain.com`
+- Admin frontend: `https://yourdomain.com/admin/`
+- Admin API: `https://yourdomain.com/api/v1/admin/*`
+- Customer API: `https://yourdomain.com/api/v1/customer/*`
+
 ## 2) Hostinger hPanel Setup
 
 1. Add/connect your main domain.
@@ -77,6 +84,22 @@ Configure document roots:
 - `api-admin.yourdomain.com` -> `backend/admin/public`
 - `api-customer.yourdomain.com` -> `backend/customer/public`
 
+### Single-domain fallback (if subdomains are unavailable)
+
+1. Upload `backend/` inside your main site root (`public_html/backend`).
+2. Ensure `public_html/.htaccess` is the one from this repo build output. It already routes:
+   - `/api/v1/admin/*` -> `backend/admin/public/index.php`
+   - `/api/v1/customer/*` -> `backend/customer/public/index.php`
+   - `/health` -> `backend/admin/public/index.php`
+   - `/uploads/products/*` -> `backend/admin/public/index.php`
+3. In `public_html/runtime-config.js`, keep same-origin API mode:
+
+```javascript
+window.__SOUCUL_CONFIG__ = window.__SOUCUL_CONFIG__ || {};
+window.__SOUCUL_CONFIG__.adminApiBaseUrl = "";
+window.__SOUCUL_CONFIG__.customerApiBaseUrl = "";
+```
+
 ## 8) Database Setup
 
 1. Create MySQL database and user in Hostinger.
@@ -121,6 +144,13 @@ Check these URLs:
 
 - `https://api-admin.yourdomain.com/health`
 - `https://api-customer.yourdomain.com/health`
+- `https://yourdomain.com`
+- `https://yourdomain.com/admin/`
+
+If using single-domain fallback instead of subdomains, verify:
+
+- `https://yourdomain.com/health`
+- `https://yourdomain.com/api/v1/customer/health`
 - `https://yourdomain.com`
 - `https://yourdomain.com/admin/`
 
