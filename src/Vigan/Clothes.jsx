@@ -5,7 +5,7 @@ import Categories from "../Components/Categories";
 import Products from "../Components/Products";
 import Footer from "../Components/Footer";
 
-import shirtImg from "../assets/shirt.png";
+import shirtImg from "../assets/Shirt.png";
 
 const allProducts = [
   { id: 1, name: "Shirt", location: "Vigan", price: 1500, image: shirtImg },
