@@ -1,6 +1,15 @@
 Options -MultiViews
 RewriteEngine On
 
+# Production environment variables (uncomment and set in hosting panel if needed)
+# SetEnv DB_HOST localhost
+# SetEnv DB_PORT 3306
+# SetEnv DB_NAME your_database_name
+# SetEnv DB_USER your_database_user
+# SetEnv DB_PASS your_database_password
+# SetEnv JWT_SECRET replace_with_long_random_secret
+# SetEnv JWT_EXPIRY_SECONDS 28800
+
 # ✅ ALWAYS send CORS headers (Apache level)
 Header always set Access-Control-Allow-Origin "*"
 Header always set Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"

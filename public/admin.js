@@ -665,7 +665,11 @@ function getAdminAssetBaseUrl() {
     return String(window.SOUCUL_ADMIN_API_BASE_URL).replace(/\/+$/, "");
   }
 
-  return "http://127.0.0.1:8000";
+  if (window.__SOUCUL_CONFIG__?.adminApiBaseUrl) {
+    return String(window.__SOUCUL_CONFIG__.adminApiBaseUrl).replace(/\/+$/, "");
+  }
+
+  return window.location.origin;
 }
 
 function resolveProductImageUrl(src) {

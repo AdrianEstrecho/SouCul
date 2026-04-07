@@ -6,9 +6,12 @@ const isLocalVitePort =
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
   /^517\d$/.test(window.location.port || '');
 
+const runtimeConfig = window.__SOUCUL_CONFIG__ || {};
+
 const API_BASE_URL = (
   window.SOUCUL_ADMIN_API_BASE_URL ||
-  (isLocalVitePort ? '' : 'http://localhost:8000')
+  runtimeConfig.adminApiBaseUrl ||
+  (isLocalVitePort ? '' : window.location.origin)
 ).replace(/\/+$/, '');
 
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;

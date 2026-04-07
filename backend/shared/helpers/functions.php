@@ -60,8 +60,18 @@ function requireFields(array $body, array $fields): void {
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
-define('JWT_SECRET', 'soucul_secret_change_this_in_production');
-define('JWT_EXPIRY', 8 * 3600); // 8 hours
+$jwtSecret = getenv('JWT_SECRET');
+if (!is_string($jwtSecret) || trim($jwtSecret) === '') {
+    $jwtSecret = 'soucul_secret_change_this_in_production';
+}
+
+$jwtExpiryRaw = getenv('JWT_EXPIRY_SECONDS');
+$jwtExpiry = is_numeric($jwtExpiryRaw) && (int) $jwtExpiryRaw > 0
+    ? (int) $jwtExpiryRaw
+    : 8 * 3600;
+
+define('JWT_SECRET', $jwtSecret);
+define('JWT_EXPIRY', $jwtExpiry); // 8 hours by default
 
 function jwtEncode(array $payload): string {
     $header  = base64url_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));

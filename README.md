@@ -36,7 +36,7 @@ SouCul/
 │   ├── admin.html           # Admin panel
 │   ├── admin.js             # Admin functionality
 │   └── admin.css            # Admin styles
-├── backend/                  # PHP REST API (to be implemented)
+├── backend/                  # PHP REST APIs (admin + customer)
 ├── scripts/                  # Development utilities
 │   ├── test-db-connection.js
 │   ├── diagnose-db.js
@@ -52,7 +52,7 @@ SouCul/
 └── .env                     # Database configuration
 ```
 
-**Note:** Frontend stays in root for easy Vercel deployment. Backend has its own folder.
+**Note:** Frontend stays in root for straightforward static build deployment. Backend has its own folder.
 
 ## 🚀 Quick Start
 
@@ -131,6 +131,33 @@ Access at:
 
 **Complete backend setup guide:** [guides/BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md)
 
+## 🌐 Production Deployment (Hostinger Premium)
+
+Recommended production topology:
+
+- `https://yourdomain.com` -> React frontend
+- `https://api-admin.yourdomain.com` -> Admin API (`backend/admin/public`)
+- `https://api-customer.yourdomain.com` -> Customer API (`backend/customer/public`)
+
+Quick flow:
+
+1. Build frontend:
+   ```bash
+   npm run build
+   ```
+2. Upload contents of `dist/` to your main domain `public_html`.
+3. Upload `backend/` folder and point subdomain document roots to admin/customer `public` directories.
+4. Set production API URLs in `public_html/runtime-config.js`:
+   ```javascript
+   window.__SOUCUL_CONFIG__ = window.__SOUCUL_CONFIG__ || {};
+   window.__SOUCUL_CONFIG__.adminApiBaseUrl = "https://api-admin.yourdomain.com";
+   window.__SOUCUL_CONFIG__.customerApiBaseUrl = "https://api-customer.yourdomain.com";
+   ```
+5. Import `backend/database-schema.sql` then `backend/migration.sql` in Hostinger MySQL.
+6. Configure DB/JWT environment variables for both API hosts.
+
+Full step-by-step instructions: [guides/HOSTINGER_DEPLOYMENT.md](./guides/HOSTINGER_DEPLOYMENT.md)
+
 ## 🗄️ Database Setup
 
 1. **Start XAMPP MySQL** (port 3307 or 3306)
@@ -154,6 +181,7 @@ See [BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md) for detailed database setup in
   - Database schema
   - API contract
   - Testing & deployment
+- **[HOSTINGER_DEPLOYMENT.md](./guides/HOSTINGER_DEPLOYMENT.md)** - Step-by-step production deployment for Hostinger Premium (frontend + admin/customer APIs)
 
 ## 🛠️ Tech Stack
 
@@ -168,8 +196,7 @@ See [BACKEND_GUIDE.md](./guides/BACKEND_GUIDE.md) for detailed database setup in
 - Composer
 
 **Deployment:**
-- Frontend: Vercel
-- Backend: Hostinger
+- Hostinger Premium (frontend + backend)
 
 ## 👥 Team
 
