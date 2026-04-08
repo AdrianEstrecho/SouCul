@@ -1,6 +1,6 @@
 // Admin API Service Layer
 // Connects the frontend admin panel to the PHP backend API
-// Keep this class aligned with active calls from public/admin.js.
+// Keep this class aligned with active calls from public/admin/admin.js.
 
 const isLocalVitePort =
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
