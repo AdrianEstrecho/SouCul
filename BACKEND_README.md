@@ -113,7 +113,7 @@ curl -X GET http://localhost:8000/api/v1/admin/products \
 
 ## Integrating with Admin Panel
 
-Update `public/admin.js` to use the backend API instead of local state.
+Update `public/admin/admin.js` to use the backend API instead of local state.
 
 Example login function:
 ```javascript
@@ -184,7 +184,7 @@ backend/
 ## Next Steps
 
 1. ✅ Backend is running
-2. Update `public/admin.js` to call API endpoints
+2. Update `public/admin/admin.js` to call API endpoints
 3. Test all admin panel features
 4. Add proper error handling
 5. Implement file upload for product images
