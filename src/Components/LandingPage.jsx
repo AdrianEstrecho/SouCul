@@ -56,7 +56,7 @@ export default function LandingPage({ cartCount }) {
         <img src={cloud4} alt="" className="landing-cloud landing-cloud-4" />
 
         <div className="landing-title-group">
-          <h1 className="landing-title">SoulCul</h1>
+          <h1 className="landing-title">SouCul</h1>
           <span className="landing-badge">SOUVENIER</span>
         </div>
       </section>

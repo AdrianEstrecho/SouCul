@@ -307,7 +307,7 @@ function ChangePasswordModal({ onClose }) {
                 <div className="strength-bar-wrap">
                   <div className="strength-bar">
                     {[1, 2, 3, 4].map(n => (
-                      <div key={n} className="strength-segment" style={{ background: n <= strength ? strengthColor : "#e5ddd5" }} />
+                      <div key={n} className="strength-segment" style={{ background: n <= strength ? strengthColor : "#cfe4f2" }} />
                     ))}
                   </div>
                   <span className="strength-label" style={{ color: strengthColor }}>{strengthLabel}</span>
@@ -415,7 +415,7 @@ function TwoFAModal({ enabled, onClose }) {
                 onChange={e => handleDigit(i, e.target.value)} onKeyDown={e => handleKeyDown(i, e)} />
             ))}
           </div>
-          <p style={{ fontSize: 12, color: "#aaa", margin: "12px 0 20px", textAlign: "center" }}>Didn't receive it? <span style={{ color: "#7c4a2d", cursor: "pointer", fontWeight: 600 }}>Resend</span></p>
+          <p style={{ fontSize: 12, color: "#aaa", margin: "12px 0 20px", textAlign: "center" }}>Didn't receive it? <span style={{ color: "#2a88b5", cursor: "pointer", fontWeight: 600 }}>Resend</span></p>
           <div className="modal-actions">
             <button className="btn-cancel" onClick={() => setStep("choose")}>Back</button>
             <button className="btn-save" onClick={verify}>Verify & Enable</button>
@@ -611,10 +611,165 @@ function WishlistSection() {
   );
 }
 
+// ── Add Address Modal ─────────────────────────────────────────────────────
+const ADDRESS_LABEL_OPTIONS = [
+  {
+    value: "Home",
+    icon: ["M3 12 12 4l9 8", "M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"],
+  },
+  {
+    value: "Office",
+    icon: ["M3 21h18", "M5 21V7l8-4v18", "M19 21V11l-6-4", "M9 9h.01", "M9 12h.01", "M9 15h.01", "M9 18h.01"],
+  },
+  {
+    value: "Other",
+    icon: ["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z", "M12 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
+  },
+];
+
+function AddAddressModal({ onSave, onClose }) {
+  const [label, setLabel] = useState("Home");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const validate = () => {
+    const e = {};
+    if (!addressLine.trim()) e.addressLine = "Address line is required.";
+    if (!city.trim()) e.city = "City is required.";
+    if (!province.trim()) e.province = "Province is required.";
+    return e;
+  };
+
+  const handleSubmit = async () => {
+    const v = validate();
+    setErrors(v);
+    if (Object.keys(v).length) return;
+
+    setSubmitError("");
+    setSubmitting(true);
+    try {
+      await onSave({
+        label,
+        address_line: addressLine.trim(),
+        city: city.trim(),
+        province: province.trim(),
+        postal_code: postalCode.trim(),
+        is_default: isDefault ? 1 : 0,
+      });
+      onClose();
+    } catch (error) {
+      setSubmitError(error?.message || "Failed to save address.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title="Add New Address" onClose={onClose}>
+      <p className="addr-modal-intro">
+        Save a delivery destination so you can check out faster next time.
+      </p>
+
+      <div className="addr-form">
+        <div className="form-group">
+          <label className="form-label">Label</label>
+          <div className="addr-label-grid">
+            {ADDRESS_LABEL_OPTIONS.map((opt) => (
+              <button
+                type="button"
+                key={opt.value}
+                className={`addr-label-btn${label === opt.value ? " selected" : ""}`}
+                onClick={() => setLabel(opt.value)}
+              >
+                <Icon d={opt.icon} size={24} stroke={1.8} />
+                <span className="addr-label-btn-text">{opt.value}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Address Line</label>
+          <input
+            className="form-input"
+            placeholder="House number, street, barangay"
+            value={addressLine}
+            onChange={(e) => setAddressLine(e.target.value)}
+          />
+          {errors.addressLine && <span className="addr-field-error">{errors.addressLine}</span>}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">City</label>
+          <input
+            className="form-input"
+            placeholder="e.g. Vigan"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          {errors.city && <span className="addr-field-error">{errors.city}</span>}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Province</label>
+          <input
+            className="form-input"
+            placeholder="e.g. Ilocos Sur"
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
+          />
+          {errors.province && <span className="addr-field-error">{errors.province}</span>}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Postal Code <span style={{ color: "#9bb1c2", fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input
+            className="form-input"
+            placeholder="2700"
+            value={postalCode}
+            onChange={(e) => setPostalCode(e.target.value)}
+          />
+        </div>
+
+        <div
+          className={`addr-default-toggle${isDefault ? " checked" : ""}`}
+          onClick={() => setIsDefault(!isDefault)}
+        >
+          <div className="check-box">
+            {isDefault && <Icon d={icons.check} size={14} stroke={3} />}
+          </div>
+          <div>
+            <div className="addr-default-toggle-label">Set as default address</div>
+            <div className="addr-default-toggle-sub">Use this address automatically at checkout.</div>
+          </div>
+        </div>
+
+        {submitError && <div className="auth-msg auth-msg-error">{submitError}</div>}
+
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button className="btn-save" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Saving..." : "Save Address"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function AddressSection() {
   const [addresses, setAddresses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const loadAddresses = async () => {
     setIsLoading(true);
@@ -656,29 +811,10 @@ function AddressSection() {
     }
   };
 
-  const handleAddAddress = async () => {
-    const addressLine = window.prompt("Address line:");
-    if (!addressLine) return;
-
-    const city = window.prompt("City:");
-    if (!city) return;
-
-    const province = window.prompt("Province:");
-    if (!province) return;
-
-    const label = window.prompt("Label (Home/Office/Other):", "Home") || "Home";
-
-    try {
-      await customerAPI.addAddress({
-        label,
-        address_line: addressLine,
-        city,
-        province,
-      });
-      await loadAddresses();
-    } catch (error) {
-      setLoadError(error?.message || "Failed to add address.");
-    }
+  const handleAddAddress = async (payload) => {
+    // Throws on failure so the modal can display the error inline.
+    await customerAPI.addAddress(payload);
+    await loadAddresses();
   };
 
   return (
@@ -705,19 +841,21 @@ function AddressSection() {
             </div>
           </div>
         ))}
-        <button className="add-address-btn" onClick={handleAddAddress}>+ Add New Address</button>
+        <button className="add-address-btn" onClick={() => setShowAddModal(true)}>+ Add New Address</button>
       </div>
+      {showAddModal && (
+        <AddAddressModal
+          onSave={handleAddAddress}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ── Payment Section (Enhanced) ─────────────────────────────────────────────
 function PaymentSection() {
-  const [methods, setMethods] = useState([
-    { id: 1, icon: "💳", name: "Visa", meta: "ending in 4242 · Exp 08/28", active: true },
-    { id: 2, icon: "📱", name: "GCash", meta: "+63 917 *** 8901", active: false },
-    { id: 3, icon: "🏦", name: "Maya", meta: "+63 926 *** 1122", active: false },
-  ]);
+  const [methods, setMethods] = useState([]);
   const [showModal, setShowModal] = useState(false);
 
   const handleAdd = (method) => {
@@ -735,6 +873,9 @@ function PaymentSection() {
   return (
     <div className="section-content">
       <h3 className="section-title">Payment Methods</h3>
+      {methods.length === 0 && (
+        <div style={EMPTY_STATE_STYLE}>No payment methods yet.</div>
+      )}
       <div className="payment-list">
         {methods.map(({ id, icon, name, meta, active }) => (
           <div key={id} className={`payment-card${active ? " payment-active" : ""}`}>
@@ -928,14 +1069,16 @@ function SecuritySection() {
 }
 
 function ReviewsSection() {
+  const reviews = [];
+
   return (
     <div className="section-content">
       <h3 className="section-title">My Reviews</h3>
+      {reviews.length === 0 && (
+        <div style={EMPTY_STATE_STYLE}>No reviews yet.</div>
+      )}
       <div className="reviews-list">
-        {[
-          { product: "Barong Tagalog", rating: 5, date: "Mar 21, 2026", comment: "Absolutely beautiful craftsmanship. The fabric is light and the embroidery is stunning." },
-          { product: "Inabel Shirt", rating: 4, date: "Mar 5, 2026", comment: "Great quality weave. Runs slightly small so size up." },
-        ].map((r, i) => (
+        {reviews.map((r, i) => (
           <div key={i} className="review-card">
             <div className="review-header">
               <div className="review-product">{r.product}</div>
@@ -1121,10 +1264,10 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .profile-page { min-height: 100vh; background: #f7f3ef; font-family: 'DM Sans', sans-serif; color: #1a1208; }
+        .profile-page { min-height: 100vh; background: #eef6fb; font-family: 'DM Sans', sans-serif; color: #0a2540; }
 
         .profile-banner {
-          background: linear-gradient(135deg, #3d2b1f 0%, #7c4a2d 50%, #c17f4a 100%);
+          background: linear-gradient(135deg, #0a3a66 0%, #2a88b5 50%, #6dcbeb 100%);
           padding: 120px 32px 80px; position: relative; overflow: hidden;
         }
         .profile-banner::before {
@@ -1136,26 +1279,26 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         .avatar-card { max-width: 920px; margin: -48px auto 0; padding: 0 24px; position: relative; z-index: 10; }
         .avatar-inner { background: #fff; border-radius: 20px; padding: 28px 32px; display: flex; align-items: center; gap: 24px; box-shadow: 0 8px 40px rgba(0,0,0,0.10); flex-wrap: wrap; }
-        .avatar-circle { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #c17f4a, #7c4a2d); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; flex-shrink: 0; position: relative; cursor: pointer; overflow: hidden; }
+        .avatar-circle { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #6dcbeb, #2a88b5); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; flex-shrink: 0; position: relative; cursor: pointer; overflow: hidden; }
         .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
-        .avatar-cam { position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; background: #1a1208; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; }
+        .avatar-cam { position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; background: #0a2540; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; }
         .avatar-info { flex: 1; min-width: 120px; }
         .avatar-name { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; }
         .avatar-email { font-size: 14px; color: #888; margin-top: 2px; }
         .avatar-stats { display: flex; gap: 24px; }
         .stat-item { text-align: center; }
-        .stat-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #7c4a2d; }
+        .stat-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #2a88b5; }
         .stat-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
-        .edit-btn { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #f7f3ef; border: 1.5px solid #e5ddd5; border-radius: 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #3d2b1f; transition: all .2s; }
-        .edit-btn:hover { background: #ede6dd; }
+        .edit-btn { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #eef6fb; border: 1.5px solid #cfe4f2; border-radius: 10px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #0a3a66; transition: all .2s; }
+        .edit-btn:hover { background: #d8ebf5; }
 
         .profile-layout { max-width: 920px; margin: 24px auto; padding: 0 24px 60px; display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
 
         .sidebar { background: #fff; border-radius: 16px; padding: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); height: fit-content; position: sticky; top: 90px; }
         .sidebar-nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: #666; transition: all .2s; margin-bottom: 2px; }
-        .sidebar-nav-item:hover { background: #f7f3ef; color: #3d2b1f; }
-        .sidebar-nav-item.active { background: linear-gradient(135deg, #7c4a2d, #c17f4a); color: #fff; }
-        .sidebar-divider { height: 1px; background: #f0ebe4; margin: 10px 0; }
+        .sidebar-nav-item:hover { background: #eef6fb; color: #0a3a66; }
+        .sidebar-nav-item.active { background: linear-gradient(135deg, #2a88b5, #6dcbeb); color: #fff; }
+        .sidebar-divider { height: 1px; background: #dbeaf2; margin: 10px 0; }
         .sidebar-logout { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: #e53e3e; transition: background .2s; }
         .sidebar-logout:hover { background: #fff5f5; }
 
@@ -1164,19 +1307,56 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
         /* ── Modal ── */
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; backdrop-filter: blur(2px); }
         .modal-box { background: #fff; border-radius: 20px; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; overflow-x: hidden; }
+
+        /* ── Add Address modal ── */
+        .addr-modal-intro { font-size: 13px; color: #6a7a8a; margin-bottom: 18px; line-height: 1.5; }
+        .addr-form { display: flex; flex-direction: column; gap: 16px; }
+        .addr-label-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+        .addr-label-btn {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 6px; padding: 14px 8px;
+          border: 2px solid #cfe4f2; border-radius: 14px; background: #f7fbfd;
+          cursor: pointer; transition: all .2s;
+        }
+        .addr-label-btn:hover { border-color: #6dcbeb; background: #eaf6fc; }
+        .addr-label-btn.selected {
+          border-color: #2a88b5; background: #eaf6fc;
+          box-shadow: 0 4px 14px rgba(42,136,181,0.18);
+        }
+        .addr-label-btn svg { color: #2a88b5; }
+        .addr-label-btn-text { font-size: 13px; font-weight: 600; color: #0a2540; }
+        .addr-default-toggle {
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 14px; border-radius: 12px; border: 1.5px solid #cfe4f2; background: #f7fbfd;
+          cursor: pointer; user-select: none; transition: all .2s;
+        }
+        .addr-default-toggle:hover { border-color: #6dcbeb; background: #eaf6fc; }
+        .addr-default-toggle .check-box {
+          width: 20px; height: 20px; border-radius: 6px; border: 2px solid #cfe4f2;
+          background: #fff; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+          color: #fff; transition: all .2s;
+        }
+        .addr-default-toggle.checked .check-box {
+          background: linear-gradient(135deg, #2a88b5, #6dcbeb); border-color: #2a88b5;
+        }
+        .addr-default-toggle-label { font-size: 13px; font-weight: 600; color: #0a2540; }
+        .addr-default-toggle-sub { font-size: 12px; color: #6a7a8a; margin-top: 1px; }
+        .addr-field-error { color: #e53e3e; font-size: 12px; margin-top: 4px; }
         .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
         .modal-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
-        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #e5ddd5; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #888; transition: all .2s; }
-        .modal-close:hover { background: #f7f3ef; color: #1a1208; }
-        .modal-body { padding: 20px 24px 24px; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #cfe4f2; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #888; transition: all .2s; }
+        .modal-close:hover { background: #eef6fb; color: #0a2540; }
+        /* Override the global .modal-body rule in ViganCss.css that sets
+           display:flex + min-height:420px (intended for a different modal). */
+        .modal-box .modal-body { display: block; min-height: 0; padding: 20px 24px 24px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
 
         /* ── Change Photo ── */
-        .photo-drop-zone { border: 2px dashed #e5ddd5; border-radius: 16px; cursor: pointer; position: relative; overflow: hidden; width: 180px; height: 180px; flex-shrink: 0; margin: 0 auto 0; display: flex; align-items: center; justify-content: center; background: #faf8f5; transition: border-color .2s; }
-        .photo-drop-zone.dragging { border-color: #c17f4a; background: #fdf6ee; }
+        .photo-drop-zone { border: 2px dashed #cfe4f2; border-radius: 16px; cursor: pointer; position: relative; overflow: hidden; width: 180px; height: 180px; flex-shrink: 0; margin: 0 auto 0; display: flex; align-items: center; justify-content: center; background: #f4fafd; transition: border-color .2s; }
+        .photo-drop-zone.dragging { border-color: #6dcbeb; background: #eaf6fc; }
         .photo-drop-zone:hover .photo-drop-overlay { opacity: 1; }
         .photo-preview-img { width: 100%; height: 100%; object-fit: cover; }
-        .photo-placeholder { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #c17f4a, #7c4a2d); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; }
+        .photo-placeholder { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #6dcbeb, #2a88b5); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; }
         .photo-drop-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #fff; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .2s; }
         .photo-modal-content { display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .photo-hint { text-align: center; font-size: 12px; color: #aaa; }
@@ -1184,14 +1364,14 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         /* ── Payment Type Grid ── */
         .payment-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
-        .payment-type-btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; border: 2px solid #e5ddd5; border-radius: 12px; cursor: pointer; transition: all .2s; }
-        .payment-type-btn.selected { border-color: #c17f4a; background: #fdf6ee; }
+        .payment-type-btn { display: flex; flex-direction: column; align-items: center; padding: 14px 10px; border: 2px solid #cfe4f2; border-radius: 12px; cursor: pointer; transition: all .2s; }
+        .payment-type-btn.selected { border-color: #6dcbeb; background: #eaf6fc; }
 
         /* ── Password ── */
         .pw-input-wrap { position: relative; }
         .pw-input { padding-right: 44px !important; }
         .pw-eye { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #aaa; padding: 4px; display: flex; align-items: center; }
-        .pw-eye:hover { color: #7c4a2d; }
+        .pw-eye:hover { color: #2a88b5; }
         .input-error { border-color: #ef4444 !important; }
         .input-error-msg { font-size: 12px; color: #ef4444; margin-top: 4px; }
         .strength-bar-wrap { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
@@ -1205,14 +1385,14 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
         /* ── 2FA ── */
         .tfa-info-box { display: flex; gap: 14px; align-items: flex-start; background: #fef3c7; border-radius: 12px; padding: 14px 16px; margin-bottom: 4px; }
         .tfa-method-list { display: flex; flex-direction: column; gap: 10px; }
-        .tfa-method-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid #e5ddd5; border-radius: 12px; cursor: pointer; transition: all .2s; }
-        .tfa-method-card.selected { border-color: #c17f4a; background: #fdf6ee; }
-        .tfa-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #e5ddd5; margin-left: auto; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .tfa-method-card.selected .tfa-radio { border-color: #c17f4a; }
-        .tfa-radio-dot { width: 10px; height: 10px; border-radius: 50%; background: #c17f4a; }
+        .tfa-method-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 2px solid #cfe4f2; border-radius: 12px; cursor: pointer; transition: all .2s; }
+        .tfa-method-card.selected { border-color: #6dcbeb; background: #eaf6fc; }
+        .tfa-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #cfe4f2; margin-left: auto; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .tfa-method-card.selected .tfa-radio { border-color: #6dcbeb; }
+        .tfa-radio-dot { width: 10px; height: 10px; border-radius: 50%; background: #6dcbeb; }
         .otp-grid { display: flex; gap: 8px; justify-content: center; }
-        .otp-input { width: 44px; height: 52px; border: 2px solid #e5ddd5; border-radius: 12px; text-align: center; font-size: 20px; font-weight: 700; font-family: 'Playfair Display', serif; color: #1a1208; background: #faf8f5; outline: none; transition: border .2s; }
-        .otp-input:focus { border-color: #c17f4a; background: #fff; }
+        .otp-input { width: 44px; height: 52px; border: 2px solid #cfe4f2; border-radius: 12px; text-align: center; font-size: 20px; font-weight: 700; font-family: 'Playfair Display', serif; color: #0a2540; background: #f4fafd; outline: none; transition: border .2s; }
+        .otp-input:focus { border-color: #6dcbeb; background: #fff; }
 
         /* ── Success ── */
         .success-state { text-align: center; padding: 20px 0; }
@@ -1232,12 +1412,12 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
         .form-group { display: flex; flex-direction: column; gap: 6px; }
         .form-group.full { grid-column: 1/-1; }
         .form-label { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .8px; }
-        .form-input { padding: 11px 14px; border: 1.5px solid #e5ddd5; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: #1a1208; background: #faf8f5; outline: none; transition: border .2s; width: 100%; }
-        .form-input:focus { border-color: #c17f4a; background: #fff; }
+        .form-input { padding: 11px 14px; border: 1.5px solid #cfe4f2; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: #0a2540; background: #f4fafd; outline: none; transition: border .2s; width: 100%; }
+        .form-input:focus { border-color: #6dcbeb; background: #fff; }
         .form-actions { display: flex; gap: 10px; justify-content: flex-end; }
-        .btn-save { padding: 10px 24px; background: linear-gradient(135deg, #7c4a2d, #c17f4a); color: #fff; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+        .btn-save { padding: 10px 24px; background: linear-gradient(135deg, #2a88b5, #6dcbeb); color: #fff; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
         .btn-save:hover { opacity: .9; }
-        .btn-cancel { padding: 10px 20px; background: #f7f3ef; border: 1.5px solid #e5ddd5; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; color: #666; }
+        .btn-cancel { padding: 10px 20px; background: #eef6fb; border: 1.5px solid #cfe4f2; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; color: #666; }
 
         /* ── Section ── */
         .section-content { padding: 32px; }
@@ -1245,19 +1425,19 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         /* ── Profile Details ── */
         .pd-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-        .pd-avatar-block { display: flex; align-items: center; gap: 18px; background: #fdf9f5; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; border: 1.5px solid #f0ebe4; }
-        .pd-avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #c17f4a, #7c4a2d); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; flex-shrink: 0; position: relative; cursor: pointer; overflow: hidden; }
+        .pd-avatar-block { display: flex; align-items: center; gap: 18px; background: #f4fafd; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; border: 1.5px solid #dbeaf2; }
+        .pd-avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #6dcbeb, #2a88b5); display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 22px; color: #fff; flex-shrink: 0; position: relative; cursor: pointer; overflow: hidden; }
         .pd-avatar-img { width: 100%; height: 100%; object-fit: cover; }
         .pd-avatar-name { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
         .pd-avatar-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
-        .change-photo-link { background: none; border: none; color: #7c4a2d; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: 6px; padding: 0; text-decoration: underline; }
+        .change-photo-link { background: none; border: none; color: #2a88b5; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: 6px; padding: 0; text-decoration: underline; }
         .pd-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-        .pd-detail-card { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px solid #f0ebe4; border-radius: 14px; background: #fafaf8; transition: border .2s; }
-        .pd-detail-card:hover { border-color: #c17f4a; }
+        .pd-detail-card { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 14px; background: #f7fbfd; transition: border .2s; }
+        .pd-detail-card:hover { border-color: #6dcbeb; }
         .pd-detail-emoji { font-size: 22px; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-shrink: 0; }
         .pd-detail-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; }
-        .pd-detail-value { font-size: 14px; font-weight: 600; color: #1a1208; }
-        .pd-account-strip { display: flex; align-items: center; background: linear-gradient(135deg, #3d2b1f, #7c4a2d); border-radius: 14px; padding: 20px 24px; }
+        .pd-detail-value { font-size: 14px; font-weight: 600; color: #0a2540; }
+        .pd-account-strip { display: flex; align-items: center; background: linear-gradient(135deg, #0a3a66, #2a88b5); border-radius: 14px; padding: 20px 24px; }
         .pd-strip-item { flex: 1; text-align: center; }
         .pd-strip-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #fff; }
         .pd-strip-label { font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
@@ -1265,45 +1445,45 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         /* ── Orders ── */
         .orders-list { display: flex; flex-direction: column; gap: 12px; }
-        .order-card { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1.5px solid #f0ebe4; border-radius: 12px; transition: border .2s; }
-        .order-card:hover { border-color: #c17f4a; }
-        .order-emoji { font-size: 28px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #f7f3ef; border-radius: 10px; }
+        .order-card { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; transition: border .2s; }
+        .order-card:hover { border-color: #6dcbeb; }
+        .order-emoji { font-size: 28px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #eef6fb; border-radius: 10px; }
         .order-info { flex: 1; }
         .order-id { font-weight: 600; font-size: 14px; }
         .order-meta { font-size: 12px; color: #aaa; margin-top: 2px; }
         .order-right { text-align: right; }
         .order-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
-        .order-total { font-weight: 700; font-size: 15px; margin-top: 4px; color: #7c4a2d; }
+        .order-total { font-weight: 700; font-size: 15px; margin-top: 4px; color: #2a88b5; }
 
         /* ── Wishlist ── */
         .wishlist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .wish-card { padding: 16px; border: 1.5px solid #f0ebe4; border-radius: 12px; }
+        .wish-card { padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; }
         .wish-emoji { font-size: 32px; margin-bottom: 8px; }
         .wish-name { font-weight: 600; font-size: 14px; }
         .wish-location { font-size: 12px; color: #aaa; margin: 4px 0 10px; }
         .wish-footer { display: flex; align-items: center; justify-content: space-between; }
-        .wish-price { font-weight: 700; color: #7c4a2d; }
+        .wish-price { font-weight: 700; color: #2a88b5; }
         .wish-remove { background: none; border: none; cursor: pointer; color: #ccc; font-size: 14px; }
         .wish-remove:hover { color: #e53e3e; }
 
         /* ── Addresses ── */
         .address-list { display: flex; flex-direction: column; gap: 12px; }
-        .address-card { padding: 16px; border: 1.5px solid #f0ebe4; border-radius: 12px; }
-        .address-default { border-color: #c17f4a; background: #fdf9f5; }
+        .address-card { padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; }
+        .address-default { border-color: #6dcbeb; background: #f4fafd; }
         .address-label-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .address-label { font-weight: 700; font-size: 13px; }
-        .default-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #fde8cc; color: #7c4a2d; }
+        .default-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #cfe7f5; color: #2a88b5; }
         .address-text { font-size: 13px; color: #666; line-height: 1.5; }
         .address-actions { display: flex; gap: 8px; margin-top: 10px; }
-        .addr-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border: 1.5px solid #e5ddd5; border-radius: 8px; background: none; cursor: pointer; color: #555; display: flex; align-items: center; gap: 4px; }
+        .addr-btn { font-size: 12px; font-weight: 500; padding: 5px 12px; border: 1.5px solid #cfe4f2; border-radius: 8px; background: none; cursor: pointer; color: #555; display: flex; align-items: center; gap: 4px; }
         .addr-btn-danger { color: #e53e3e; border-color: #fecaca; }
-        .add-address-btn { margin-top: 4px; width: 100%; padding: 12px; border: 2px dashed #e5ddd5; border-radius: 12px; background: none; font-family: 'DM Sans', sans-serif; font-size: 14px; color: #aaa; cursor: pointer; transition: all .2s; }
-        .add-address-btn:hover { border-color: #c17f4a; color: #7c4a2d; }
+        .add-address-btn { margin-top: 4px; width: 100%; padding: 12px; border: 2px dashed #cfe4f2; border-radius: 12px; background: none; font-family: 'DM Sans', sans-serif; font-size: 14px; color: #aaa; cursor: pointer; transition: all .2s; }
+        .add-address-btn:hover { border-color: #6dcbeb; color: #2a88b5; }
 
         /* ── Payment ── */
         .payment-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
-        .payment-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid #f0ebe4; border-radius: 12px; flex-wrap: wrap; }
-        .payment-active { border-color: #c17f4a; background: #fdf9f5; }
+        .payment-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; flex-wrap: wrap; }
+        .payment-active { border-color: #6dcbeb; background: #f4fafd; }
         .payment-icon { font-size: 24px; }
         .payment-info { flex: 1; min-width: 120px; }
         .payment-name { font-weight: 600; font-size: 14px; }
@@ -1312,26 +1492,26 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, i
 
         /* ── Notifications ── */
         .notif-list { display: flex; flex-direction: column; gap: 4px; }
-        .notif-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #f5f0ea; }
+        .notif-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #e6f0f7; }
         .notif-label { font-weight: 500; font-size: 14px; }
         .notif-desc { font-size: 12px; color: #aaa; margin-top: 2px; }
-        .toggle { width: 44px; height: 24px; border-radius: 12px; background: #e5ddd5; cursor: pointer; position: relative; transition: background .25s; flex-shrink: 0; }
-        .toggle.on { background: linear-gradient(135deg, #7c4a2d, #c17f4a); }
+        .toggle { width: 44px; height: 24px; border-radius: 12px; background: #cfe4f2; cursor: pointer; position: relative; transition: background .25s; flex-shrink: 0; }
+        .toggle.on { background: linear-gradient(135deg, #2a88b5, #6dcbeb); }
         .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .25s; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
         .toggle.on .toggle-thumb { transform: translateX(20px); }
 
         /* ── Security ── */
         .security-list { display: flex; flex-direction: column; gap: 4px; }
-        .security-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f5f0ea; cursor: pointer; }
-        .security-row:hover .security-label { color: #7c4a2d; }
-        .security-icon { font-size: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #f7f3ef; border-radius: 8px; flex-shrink: 0; }
+        .security-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #e6f0f7; cursor: pointer; }
+        .security-row:hover .security-label { color: #2a88b5; }
+        .security-icon { font-size: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #eef6fb; border-radius: 8px; flex-shrink: 0; }
         .security-info { flex: 1; }
         .security-label { font-weight: 500; font-size: 14px; }
         .security-desc { font-size: 12px; color: #aaa; margin-top: 1px; }
 
         /* ── Reviews ── */
         .reviews-list { display: flex; flex-direction: column; gap: 14px; }
-        .review-card { padding: 16px; border: 1.5px solid #f0ebe4; border-radius: 12px; }
+        .review-card { padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; }
         .review-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
         .review-product { font-weight: 600; font-size: 14px; }
         .review-date { font-size: 12px; color: #aaa; }

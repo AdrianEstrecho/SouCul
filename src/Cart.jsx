@@ -34,7 +34,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
   };
 
   return (
-    <div className="soucul-app" style={{ minHeight: "100vh", background: "linear-gradient(160deg, #0d7377 0%, #14a085 50%, #0a5c61 100%)", position: "relative", overflow: "hidden" }}>
+    <div className="soucul-app" style={{ minHeight: "100vh", background: "linear-gradient(160deg, #0a3a66 0%, #2a88b5 50%, #0a2540 100%)", position: "relative", overflow: "hidden" }}>
       
       <PhilippinesMapBg />
 
@@ -68,7 +68,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
                   type="checkbox"
                   checked={!!item.checked}
                   onChange={(e) => onUpdateQty(item.cartId, item.qty, e.target.checked)}
-                  style={{ width: 18, height: 18, accentColor: "#4ade80", flexShrink: 0, cursor: "pointer" }}
+                  style={{ width: 18, height: 18, accentColor: "#6dcbeb", flexShrink: 0, cursor: "pointer" }}
                 />
 
                 {/* Image */}
@@ -87,7 +87,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
                   <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a1a", marginBottom: 2 }}>{item.name}</div>
                   <div style={{ fontSize: 13, color: "#888", marginBottom: 10 }}>{item.location}</div>
                   <span style={{
-                    background: "#4ade80", color: "#fff", fontWeight: 800,
+                    background: "#6dcbeb", color: "#fff", fontWeight: 800,
                     fontSize: 13, padding: "4px 14px", borderRadius: 8,
                   }}>
                     ₱{item.price.toLocaleString()}
@@ -100,7 +100,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
                     onClick={() => item.qty > 1 ? onUpdateQty(item.cartId, item.qty - 1, item.checked) : onRemove(item.cartId)}
                     style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "#f0f0f0", fontWeight: 800, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                   >−</button>
-                  <span style={{ width: 28, height: 28, borderRadius: "50%", background: "#4ade80", color: "#fff", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 28, height: 28, borderRadius: "50%", background: "#6dcbeb", color: "#fff", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {item.qty}
                   </span>
                   <button
@@ -117,7 +117,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
       {/* Bottom bar */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "#0a3d40",
+        background: "#0a2540",
         padding: "20px 32px 28px",
         zIndex: 100,
         boxShadow: "0 -4px 24px rgba(0,0,0,0.25)",
@@ -145,7 +145,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
               style={{
                 width: 28, height: 28, borderRadius: 6,
                 border: "2.5px solid rgba(255,255,255,0.5)",
-                background: checkedAll ? "#4ade80" : "transparent",
+                background: checkedAll ? "#6dcbeb" : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", transition: "background 0.2s",
               }}
@@ -161,7 +161,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
 
           <div style={{ flex: 1, color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
             {selectedItems.length > 0 && (
-              <span>Total: <strong style={{ color: "#4ade80", fontSize: 16 }}>₱{selectedTotal.toLocaleString()}</strong></span>
+              <span>Total: <strong style={{ color: "#6dcbeb", fontSize: 16 }}>₱{selectedTotal.toLocaleString()}</strong></span>
             )}
           </div>
 
@@ -169,7 +169,7 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
             onClick={() => navigate("/Checkout")}
             disabled={selectedItems.length === 0}
             style={{
-              background: selectedItems.length === 0 ? "rgba(255,255,255,0.2)" : "#4ade80",
+              background: selectedItems.length === 0 ? "rgba(255,255,255,0.2)" : "#6dcbeb",
               color: "#fff",
               border: "none",
               borderRadius: 12,
@@ -177,12 +177,12 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
               fontSize: 15,
               fontWeight: 800,
               cursor: selectedItems.length === 0 ? "not-allowed" : "pointer",
-              boxShadow: selectedItems.length === 0 ? "none" : "0 4px 16px rgba(74,222,128,0.4)",
+              boxShadow: selectedItems.length === 0 ? "none" : "0 4px 16px rgba(109,203,235,0.45)",
               transition: "transform 0.1s, background 0.2s",
               opacity: selectedItems.length === 0 ? 0.5 : 1,
             }}
-            onMouseEnter={(e) => { if (selectedItems.length > 0) e.target.style.background = "#22c55e"; }}
-            onMouseLeave={(e) => { if (selectedItems.length > 0) e.target.style.background = "#4ade80"; }}
+            onMouseEnter={(e) => { if (selectedItems.length > 0) e.target.style.background = "#2a88b5"; }}
+            onMouseLeave={(e) => { if (selectedItems.length > 0) e.target.style.background = "#6dcbeb"; }}
           >
             Check Out{selectedItems.length > 0 ? ` (${selectedItems.length})` : ""}
           </button>
