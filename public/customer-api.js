@@ -13,8 +13,13 @@ const CUSTOMER_API_BASE_URL = (
   runtimeConfig.customerApiBaseUrl ||
   (isLocalVitePort ? '' : (isLocalHost ? 'http://localhost:8001' : window.location.origin))
 ).replace(/\/+$/, '');
+const SAME_ORIGIN_BASE_URL = String(window.location.origin || '').replace(/\/+$/, '');
+const API_CONFIG_ERROR_MESSAGE =
+  'Customer API returned an unexpected response. Check runtime-config.js customerApiBaseUrl and backend routing.';
 
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_INACTIVITY_SECONDS = 60 * 60 * 24 * 15;
+const SESSION_INACTIVITY_MS = SESSION_INACTIVITY_SECONDS * 1000;
+const SESSION_ACTIVITY_COOKIE = 'customer_last_activity_at';
 
 function getCookie(name) {
   const encodedName = `${encodeURIComponent(name)}=`;
@@ -30,7 +35,7 @@ function getCookie(name) {
   return null;
 }
 
-function setCookie(name, value, maxAgeSeconds = COOKIE_MAX_AGE_SECONDS) {
+function setCookie(name, value, maxAgeSeconds = SESSION_INACTIVITY_SECONDS) {
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
 }
@@ -39,28 +44,109 @@ function removeCookie(name) {
   document.cookie = `${encodeURIComponent(name)}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
+function dispatchSessionExpired(reason = 'expired') {
+  window.dispatchEvent(new CustomEvent('soucul:customer-session-expired', { detail: { reason } }));
+}
+
 class CustomerAPI {
   constructor() {
     this.baseURL = CUSTOMER_API_BASE_URL;
     this.token = getCookie('customer_token') || null;
+
+    if (this.token) {
+      if (this.isSessionStale()) {
+        this.expireSession('inactivity');
+      } else {
+        this.touchSessionActivity();
+      }
+    }
+  }
+
+  isSessionStale() {
+    const raw = getCookie(SESSION_ACTIVITY_COOKIE);
+    if (!raw) return false;
+
+    const lastActivityAt = Number(raw);
+    if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) return false;
+
+    return Date.now() - lastActivityAt > SESSION_INACTIVITY_MS;
+  }
+
+  touchSessionActivity() {
+    if (!this.token) return;
+
+    const now = String(Date.now());
+    setCookie(SESSION_ACTIVITY_COOKIE, now, SESSION_INACTIVITY_SECONDS);
+    setCookie('customer_token', this.token, SESSION_INACTIVITY_SECONDS);
+
+    const userJson = getCookie('customer_user');
+    if (userJson) {
+      setCookie('customer_user', userJson, SESSION_INACTIVITY_SECONDS);
+    }
+  }
+
+  expireSession(reason = 'expired') {
+    this.token = null;
+    removeCookie('customer_token');
+    removeCookie('customer_user');
+    removeCookie(SESSION_ACTIVITY_COOKIE);
+    dispatchSessionExpired(reason);
   }
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const sameOriginUrl = `${SAME_ORIGIN_BASE_URL}${endpoint}`;
+    const canRetrySameOrigin =
+      !!this.baseURL &&
+      !!SAME_ORIGIN_BASE_URL &&
+      SAME_ORIGIN_BASE_URL !== this.baseURL &&
+      (endpoint.startsWith('/api/') || endpoint.startsWith('/health'));
+
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers
     };
+
+    if (this.token && !options.skipAuth && this.isSessionStale()) {
+      this.expireSession('inactivity');
+      throw new Error('Session expired due to inactivity. Please log in again.');
+    }
 
     if (this.token && !options.skipAuth) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers
-      });
+      let response;
+      let usedFallbackBaseUrl = false;
+
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers
+        });
+      } catch (primaryError) {
+        const lowered = String(primaryError?.message || '').toLowerCase();
+        const isNetworkFailure =
+          primaryError instanceof TypeError ||
+          lowered.includes('failed to fetch') ||
+          lowered.includes('networkerror') ||
+          lowered.includes('name_not_resolved');
+
+        if (!canRetrySameOrigin || !isNetworkFailure) {
+          throw primaryError;
+        }
+
+        response = await fetch(sameOriginUrl, {
+          ...options,
+          headers
+        });
+        usedFallbackBaseUrl = true;
+      }
+
+      if (usedFallbackBaseUrl) {
+        this.baseURL = SAME_ORIGIN_BASE_URL;
+      }
 
       // Read the body as text first so we can handle empty bodies (204, etc.)
       // and non-JSON error pages without throwing "Unexpected end of JSON input".
@@ -71,6 +157,11 @@ class CustomerAPI {
         try {
           data = JSON.parse(rawText);
         } catch (parseError) {
+          const compact = rawText.slice(0, 120).replace(/\s+/g, ' ').trim().toLowerCase();
+          if (compact.startsWith('<!doctype') || compact.startsWith('<html')) {
+            throw new Error(`${API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+          }
+
           const snippet = rawText.slice(0, 120).replace(/\s+/g, ' ').trim();
           throw new Error(
             `Server returned ${response.status} ${response.statusText || ''} with non-JSON body${snippet ? `: ${snippet}` : ''}`
@@ -79,9 +170,21 @@ class CustomerAPI {
       }
 
       if (!response.ok) {
+        if (response.status === 401 && !options.skipAuth) {
+          this.expireSession('unauthorized');
+        }
+
         throw new Error(
           (data && data.message) || `Request failed with status ${response.status}`
         );
+      }
+
+      if (this.token && !options.skipAuth) {
+        const refreshedToken = response.headers.get('X-Auth-Token');
+        if (refreshedToken) {
+          this.token = refreshedToken;
+        }
+        this.touchSessionActivity();
       }
 
       // Empty 2xx response (e.g. 204 No Content) — return a minimal success envelope
@@ -111,8 +214,9 @@ class CustomerAPI {
 
     if (result.success && result.data.token) {
       this.token = result.data.token;
-      setCookie('customer_token', result.data.token);
-      setCookie('customer_user', JSON.stringify(result.data.user));
+      setCookie('customer_token', result.data.token, SESSION_INACTIVITY_SECONDS);
+      setCookie('customer_user', JSON.stringify(result.data.user), SESSION_INACTIVITY_SECONDS);
+      this.touchSessionActivity();
     }
 
     return result;
@@ -122,6 +226,7 @@ class CustomerAPI {
     this.token = null;
     removeCookie('customer_token');
     removeCookie('customer_user');
+    removeCookie(SESSION_ACTIVITY_COOKIE);
   }
 
   // Profile

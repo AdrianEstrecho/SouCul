@@ -43,6 +43,8 @@ import Profile from "./Profile";
 import Login from "./Login";
 import { getCookie, getJsonCookie, removeCookie, setCookie } from "./utils/cookieState";
 
+const GUEST_PROFILE = { name: "Guest", email: "", phone: "", birthday: "", gender: "", createdAt: "" };
+
 // ── Login Required Modal ──
 function LoginRequiredModal({ onClose, onGoToLogin }) {
   return (
@@ -69,7 +71,7 @@ function LoginRequiredModal({ onClose, onGoToLogin }) {
 
 
 export default function SoulCul() {
-  const GUEST_PROFILE = { name: "Guest", email: "", phone: "", birthday: "", gender: "", createdAt: "" };
+  const SESSION_MAX_AGE_DAYS = 15;
 
   // Ctrl+Alt+. shortcut to open admin panel
   useEffect(() => {
@@ -132,7 +134,24 @@ export default function SoulCul() {
     removeCookie("soulcul_currentUser");
     removeCookie("customer_token");
     removeCookie("customer_user");
+    removeCookie("customer_last_activity_at");
   };
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      clearCustomerSession();
+      setIsLoggedIn(false);
+      setIsGuest(false);
+      setUserProfile(GUEST_PROFILE);
+      setCartItems([]);
+      setDirectCheckoutItem(null);
+      setShowLoginModal(false);
+      setAuthReady(true);
+    };
+
+    window.addEventListener("soucul:customer-session-expired", handleSessionExpired);
+    return () => window.removeEventListener("soucul:customer-session-expired", handleSessionExpired);
+  }, []);
 
   const resolveImageUrl = (rawUrl) => {
     const value = String(rawUrl || "").trim();
@@ -190,7 +209,7 @@ export default function SoulCul() {
         return;
       }
 
-      setCookie("soulcul_loggedIn", "true");
+      setCookie("soulcul_loggedIn", "true", { maxAgeDays: SESSION_MAX_AGE_DAYS });
       if (!active) return;
       setIsLoggedIn(true);
       setIsGuest(false);
@@ -209,7 +228,7 @@ export default function SoulCul() {
             createdAt: p.created_at || "",
           };
           if (active) setUserProfile(mappedProfile);
-          if (p.email) setCookie("soulcul_currentUser", p.email);
+          if (p.email) setCookie("soulcul_currentUser", p.email, { maxAgeDays: SESSION_MAX_AGE_DAYS });
         }
 
         await hydrateCartFromAPI();
@@ -231,12 +250,13 @@ export default function SoulCul() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogin = (profile) => {
-    setCookie("soulcul_loggedIn", "true");
+    setCookie("soulcul_loggedIn", "true", { maxAgeDays: SESSION_MAX_AGE_DAYS });
     if (profile?.email) {
-      setCookie("soulcul_currentUser", profile.email);
+      setCookie("soulcul_currentUser", profile.email, { maxAgeDays: SESSION_MAX_AGE_DAYS });
     }
 
     setIsLoggedIn(true);
@@ -256,8 +276,8 @@ export default function SoulCul() {
   };
 
   const handleGuestLogin = () => {
-    setCookie("soulcul_loggedIn", "true");
-    setCookie("soulcul_currentUser", "guest");
+    setCookie("soulcul_loggedIn", "true", { maxAgeDays: SESSION_MAX_AGE_DAYS });
+    setCookie("soulcul_currentUser", "guest", { maxAgeDays: SESSION_MAX_AGE_DAYS });
     setIsLoggedIn(true);
     setIsGuest(true);
     setUserProfile(GUEST_PROFILE);
