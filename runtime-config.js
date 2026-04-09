@@ -50,8 +50,16 @@
 	const inferredAdmin = isHostingerPreviewDomain ? "" : inferSubdomainBaseUrl("admin");
 	const inferredCustomer = isHostingerPreviewDomain ? "" : inferSubdomainBaseUrl("customer");
 
-	config.adminApiBaseUrl = normalizeUrl(config.adminApiBaseUrl || inferredAdmin);
-	config.customerApiBaseUrl = normalizeUrl(config.customerApiBaseUrl || inferredCustomer);
+	const resolveConfiguredBaseUrl = (key, inferredValue) => {
+		const hasExplicitValue = Object.prototype.hasOwnProperty.call(config, key);
+		if (hasExplicitValue) {
+			return normalizeUrl(config[key]);
+		}
+		return normalizeUrl(inferredValue);
+	};
+
+	config.adminApiBaseUrl = resolveConfiguredBaseUrl("adminApiBaseUrl", inferredAdmin);
+	config.customerApiBaseUrl = resolveConfiguredBaseUrl("customerApiBaseUrl", inferredCustomer);
 
 	if (isHostingerPreviewDomain && isInvalidPreviewApiUrl(config.adminApiBaseUrl, "admin")) {
 		config.adminApiBaseUrl = "";
