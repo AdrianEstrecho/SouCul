@@ -40,10 +40,11 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const location = useLocation();
   const getActiveNav = () => {
     if (location.pathname === "/") return "Home";
-    if (location.pathname === "/Products" || location.pathname === "/Map" || location.pathname === "/ProductPage") return "Products";
+    if (location.pathname === "/Products" || location.pathname === "/ProductPage") return "Products";
+    if (location.pathname === "/Map") return null;
     if (location.pathname === "/AboutUs") return "About Us";
     if (location.pathname === "/Profile" || location.pathname === "/Cart" || location.pathname === "/Checkout") return null;
-    return "Products";
+    return null;
   };
   const [activeNav, setActiveNav] = useState(getActiveNav);
 
