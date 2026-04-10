@@ -24,6 +24,8 @@ $stats['pending_orders'] = (int) $db->query(
         "SELECT COUNT(*)
          FROM orders
          WHERE status IN (
+             'cash_on_delivery_requested',
+             'online_payment_requested',
              'cash_on_delivery_approved',
              'online_payment_processed',
              'waiting_for_courier',

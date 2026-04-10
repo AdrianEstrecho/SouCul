@@ -26,4 +26,25 @@ if (!$order) {
     error('Order not found', 404);
 }
 
+$items = [];
+try {
+    $itemsStmt = $db->prepare("\n        SELECT id, product_id, product_name, quantity, unit_price, total_price\n        FROM order_items\n        WHERE order_id = ?\n        ORDER BY id ASC\n    ");
+    $itemsStmt->execute([$orderId]);
+    $items = $itemsStmt->fetchAll();
+} catch (Throwable) {
+    $items = [];
+}
+
+$payment = null;
+try {
+    $paymentStmt = $db->prepare("\n        SELECT payment_method, payment_status, transaction_id, amount, processed_at\n        FROM payments\n        WHERE order_id = ?\n        LIMIT 1\n    ");
+    $paymentStmt->execute([$orderId]);
+    $payment = $paymentStmt->fetch() ?: null;
+} catch (Throwable) {
+    $payment = null;
+}
+
+$order['items'] = $items;
+$order['payment'] = $payment;
+
 success($order, 'Order details retrieved');

@@ -58,6 +58,8 @@ ALTER TABLE orders
 
 ALTER TABLE orders
   MODIFY COLUMN status ENUM(
+    'cash_on_delivery_requested',
+    'online_payment_requested',
     'cash_on_delivery_approved',
     'online_payment_processed',
     'waiting_for_courier',
@@ -68,7 +70,7 @@ ALTER TABLE orders
     'pending',
     'confirmed',
     'processing'
-  ) NOT NULL DEFAULT 'cash_on_delivery_approved';
+  ) NOT NULL DEFAULT 'cash_on_delivery_requested';
 
 -- ── 3.1 PRODUCTS — add featured flag for homepage highlights ───────────────
 

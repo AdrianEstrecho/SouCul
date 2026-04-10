@@ -118,6 +118,8 @@ CREATE TABLE IF NOT EXISTS orders (
   order_number VARCHAR(50) NOT NULL UNIQUE,
   user_id INT NOT NULL,
   status ENUM(
+    'cash_on_delivery_requested',
+    'online_payment_requested',
     'cash_on_delivery_approved',
     'online_payment_processed',
     'waiting_for_courier',
@@ -128,7 +130,7 @@ CREATE TABLE IF NOT EXISTS orders (
     'pending',
     'confirmed',
     'processing'
-  ) DEFAULT 'cash_on_delivery_approved',
+  ) DEFAULT 'cash_on_delivery_requested',
   subtotal DECIMAL(12, 2) NOT NULL,
   tax_amount DECIMAL(10, 2) DEFAULT 0,
   shipping_cost DECIMAL(10, 2) DEFAULT 0,

@@ -39,7 +39,18 @@ $orderNumber = 'ORD-' . strtoupper(uniqid());
 
 $paymentMethod = strtolower(trim((string) ($body['payment_method'] ?? '')));
 $isCashOnDelivery = in_array($paymentMethod, ['cod', 'cash_on_delivery', 'cash on delivery'], true);
-$initialStatus = $isCashOnDelivery ? 'cash_on_delivery_approved' : 'online_payment_processed';
+$initialStatus = $isCashOnDelivery ? 'cash_on_delivery_requested' : 'online_payment_requested';
+
+$normalizedPaymentMethod = match ($paymentMethod) {
+    'cod', 'cash_on_delivery', 'cash on delivery' => 'cod',
+    'gcash' => 'gcash',
+    'bank', 'bank_transfer', 'bank transfer' => 'bank_transfer',
+    'paypal' => 'paypal',
+    'debit_card', 'debit card' => 'debit_card',
+    default => 'credit_card',
+};
+
+$initialPaymentStatus = $isCashOnDelivery ? 'pending' : 'processing';
 
 // Create order
 $stmt = $db->prepare("
@@ -60,6 +71,19 @@ $stmt->execute([
 ]);
 
 $orderId = $db->lastInsertId();
+
+// Create initial payment record so payment status is visible immediately.
+try {
+    $paymentStmt = $db->prepare("\n        INSERT INTO payments (order_id, payment_method, payment_status, amount)\n        VALUES (?, ?, ?, ?)\n    ");
+    $paymentStmt->execute([
+        $orderId,
+        $normalizedPaymentMethod,
+        $initialPaymentStatus,
+        $subtotal,
+    ]);
+} catch (Throwable $e) {
+    error_log('Unable to create payment record for order ' . $orderId . ': ' . $e->getMessage());
+}
 
 // Create order items
 $stmt = $db->prepare("
