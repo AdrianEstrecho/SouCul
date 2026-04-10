@@ -42,6 +42,8 @@ const icons = {
 };
 
 const statusColor = {
+  cash_on_delivery_requested: { bg: "#fef3c7", color: "#92400e" },
+  online_payment_requested: { bg: "#dbeafe", color: "#1e40af" },
   cash_on_delivery_approved: { bg: "#fef3c7", color: "#92400e" },
   online_payment_processed: { bg: "#dbeafe", color: "#1e40af" },
   waiting_for_courier: { bg: "#e0f2fe", color: "#0c4a6e" },
@@ -55,12 +57,26 @@ const statusColor = {
 };
 
 const EMPTY_STATE_STYLE = { fontSize: 13, color: "#888", padding: "8px 0" };
+const DEFAULT_NOTIFICATION_SETTINGS = { orders: true, promos: true, wishlist: false, newsletter: false, sms: true };
 
 const safeDateLabel = (value) => {
   if (!value) return "Not set";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not set";
   return date.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+};
+
+const safeDateTimeLabel = (value) => {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not set";
+  return date.toLocaleString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const safeText = (value, fallback = "Not set") => {
@@ -73,6 +89,22 @@ const formatStatus = (value) => {
   return raw
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const formatPaymentMethodLabel = (value) => {
+  const raw = String(value || "").toLowerCase();
+  if (!raw) return "Not specified";
+
+  const methodMap = {
+    gcash: "GCash",
+    credit_card: "Card",
+    debit_card: "Card",
+    bank_transfer: "Bank Transfer",
+    paypal: "PayPal",
+    cod: "Cash On Delivery",
+  };
+
+  return methodMap[raw] || formatStatus(raw);
 };
 
 const formatPeso = (value) => `₱${Number(value || 0).toLocaleString()}`;
@@ -563,6 +595,10 @@ function OrdersSection() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [orderDetailsById, setOrderDetailsById] = useState({});
+  const [detailLoadingId, setDetailLoadingId] = useState(null);
+  const [detailErrorsById, setDetailErrorsById] = useState({});
 
   useEffect(() => {
     let mounted = true;
@@ -591,6 +627,43 @@ function OrdersSection() {
     return () => { mounted = false; };
   }, []);
 
+  const loadOrderDetails = async (orderId) => {
+    setDetailLoadingId(orderId);
+    setDetailErrorsById((prev) => ({ ...prev, [orderId]: "" }));
+
+    try {
+      if (!customerAPI || typeof customerAPI.getOrder !== "function") {
+        throw new Error("Order details API is unavailable.");
+      }
+
+      const result = await customerAPI.getOrder(orderId);
+      setOrderDetailsById((prev) => ({
+        ...prev,
+        [orderId]: result?.data && typeof result.data === "object" ? result.data : {},
+      }));
+    } catch (error) {
+      setDetailErrorsById((prev) => ({
+        ...prev,
+        [orderId]: error?.message || "Failed to load order details.",
+      }));
+    } finally {
+      setDetailLoadingId((prev) => (prev === orderId ? null : prev));
+    }
+  };
+
+  const toggleOrderDetails = async (orderId) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+
+    setExpandedOrderId(orderId);
+
+    if (!orderDetailsById[orderId]) {
+      await loadOrderDetails(orderId);
+    }
+  };
+
   return (
     <div className="section-content">
       <h3 className="section-title">My Orders</h3>
@@ -602,17 +675,153 @@ function OrdersSection() {
           const rawStatus = String(o.status || "pending").toLowerCase();
           const statusStyle = statusColor[rawStatus] || statusColor.pending;
           const orderLabel = o.order_number ? String(o.order_number) : `#${o.id}`;
+          const isExpanded = expandedOrderId === o.id;
+          const detail = orderDetailsById[o.id];
+          const detailError = detailErrorsById[o.id] || "";
+          const detailLoading = detailLoadingId === o.id;
+
+          const items = Array.isArray(detail?.items) ? detail.items : [];
+          const computedSubtotal = items.reduce(
+            (sum, item) => sum + (Number(item?.unit_price || 0) * Number(item?.quantity || 0)),
+            0
+          );
+          const subtotal = Number(detail?.subtotal ?? computedSubtotal ?? 0);
+          const shippingCost = Number(detail?.shipping_cost ?? 0);
+          const taxAmount = Number(detail?.tax_amount ?? 0);
+          const totalAmount = Number(detail?.total_amount ?? o.total_amount ?? (subtotal + shippingCost + taxAmount));
+
+          const paymentMethodRaw = String(detail?.payment?.payment_method || "").toLowerCase();
+          const fallbackPaymentMethod = String(o.payment_method || "").toLowerCase();
+          const resolvedPaymentMethod = paymentMethodRaw || fallbackPaymentMethod;
+          const paymentMethodLabel = formatPaymentMethodLabel(
+            resolvedPaymentMethod || (rawStatus.includes("cash_on_delivery") ? "cod" : "")
+          );
+
+          const displayStatusLabel = (() => {
+            if (rawStatus === "online_payment_requested") {
+              return `Paid by ${paymentMethodLabel}`;
+            }
+            if (rawStatus === "cash_on_delivery_requested") {
+              return "Cash on Delivery requested";
+            }
+            return formatStatus(rawStatus);
+          })();
+
+          const paymentStatusRaw = String(detail?.payment?.payment_status || "").toLowerCase();
+          const paymentStatusLabel = paymentStatusRaw ? formatStatus(paymentStatusRaw) : "Not specified";
+
           return (
           <div key={o.id} className="order-card">
-            <div className="order-emoji">📦</div>
-            <div className="order-info">
-              <div className="order-id">{orderLabel}</div>
-              <div className="order-meta">{safeDateLabel(o.created_at)}</div>
+            <div className="order-top">
+              <div className="order-emoji">📦</div>
+              <div className="order-info">
+                <div className="order-id">{orderLabel}</div>
+                <div className="order-meta">Placed on {safeDateLabel(o.created_at)}</div>
+              </div>
+              <div className="order-right">
+                <span className="order-status" style={statusStyle}>{displayStatusLabel}</span>
+                <div className="order-total">{formatPeso(o.total_amount)}</div>
+              </div>
             </div>
-            <div className="order-right">
-              <span className="order-status" style={statusStyle}>{formatStatus(rawStatus)}</span>
-              <div className="order-total">{formatPeso(o.total_amount)}</div>
+
+            <div className="order-actions-row">
+              <button className="order-detail-toggle" onClick={() => toggleOrderDetails(o.id)}>
+                {isExpanded ? "Hide Details" : "View Details"}
+              </button>
             </div>
+
+            {isExpanded && (
+              <div className="order-detail-panel">
+                {detailLoading && <div style={EMPTY_STATE_STYLE}>Loading order details...</div>}
+                {!detailLoading && detailError && (
+                  <div className="auth-msg auth-msg-error" style={{ marginBottom: 10 }}>{detailError}</div>
+                )}
+
+                {!detailLoading && !detailError && detail && (
+                  <>
+                    <div className="order-meta-grid">
+                      <div className="order-meta-card">
+                        <div className="order-meta-label">Order Number</div>
+                        <div className="order-meta-value">{safeText(detail.order_number || orderLabel)}</div>
+                      </div>
+                      <div className="order-meta-card">
+                        <div className="order-meta-label">Order Date</div>
+                        <div className="order-meta-value">{safeDateTimeLabel(detail.created_at || o.created_at)}</div>
+                      </div>
+                      <div className="order-meta-card">
+                        <div className="order-meta-label">Payment Method</div>
+                        <div className="order-meta-value">{paymentMethodLabel}</div>
+                      </div>
+                      <div className="order-meta-card">
+                        <div className="order-meta-label">Payment Status</div>
+                        <div className="order-meta-value">{paymentStatusLabel}</div>
+                      </div>
+                    </div>
+
+                    <div className="order-shipping-box">
+                      <div className="order-meta-label">Shipping Details</div>
+                      <div className="order-shipping-text">
+                        {safeText(detail.shipping_address, "Address not available")}
+                        {detail.shipping_city ? `, ${detail.shipping_city}` : ""}
+                        {detail.shipping_province ? `, ${detail.shipping_province}` : ""}
+                      </div>
+                      <div className="order-shipping-sub">
+                        Contact: {safeText(detail.shipping_phone, "Not provided")}
+                      </div>
+                    </div>
+
+                    <div className="order-items-box">
+                      <div className="order-items-title">Order Items</div>
+                      {items.length === 0 ? (
+                        <div style={EMPTY_STATE_STYLE}>No line items found for this order.</div>
+                      ) : (
+                        <>
+                          <div className="order-items-head">
+                            <span>Item</span>
+                            <span>Qty</span>
+                            <span>Unit Price</span>
+                            <span>Line Total</span>
+                          </div>
+                          {items.map((item) => {
+                            const quantity = Number(item?.quantity || 0);
+                            const unitPrice = Number(item?.unit_price || 0);
+                            const lineTotal = Number(item?.total_price ?? (quantity * unitPrice));
+
+                            return (
+                              <div key={item.id || `${item.product_id}-${item.product_name}`} className="order-item-row">
+                                <span>{safeText(item.product_name, "Product")}</span>
+                                <span>{quantity}</span>
+                                <span>{formatPeso(unitPrice)}</span>
+                                <span>{formatPeso(lineTotal)}</span>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="order-total-box">
+                      <div className="order-total-row">
+                        <span>Subtotal</span>
+                        <strong>{formatPeso(subtotal)}</strong>
+                      </div>
+                      <div className="order-total-row">
+                        <span>Shipping</span>
+                        <strong>{formatPeso(shippingCost)}</strong>
+                      </div>
+                      <div className="order-total-row">
+                        <span>Tax</span>
+                        <strong>{formatPeso(taxAmount)}</strong>
+                      </div>
+                      <div className="order-total-row grand">
+                        <span>Total</span>
+                        <strong>{formatPeso(totalAmount)}</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           );
         })}
@@ -1032,8 +1241,7 @@ function PaymentSection() {
 }
 
 function NotificationsSection() {
-  const defaultSettings = { orders: true, promos: true, wishlist: false, newsletter: false, sms: true };
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [notifLoading, setNotifLoading] = useState(true);
   const [alerts, setAlerts] = useState([]);
@@ -1051,7 +1259,7 @@ function NotificationsSection() {
         const [settingsResult, alertsResult] = await Promise.all([
           customerAPI && typeof customerAPI.getNotificationSettings === "function"
             ? customerAPI.getNotificationSettings()
-            : Promise.resolve({ data: defaultSettings }),
+            : Promise.resolve({ data: DEFAULT_NOTIFICATION_SETTINGS }),
           customerAPI && typeof customerAPI.getNotifications === "function"
             ? customerAPI.getNotifications({ limit: 20 })
             : Promise.resolve({ data: [] }),
@@ -1809,8 +2017,9 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
 
         /* ── Orders ── */
         .orders-list { display: flex; flex-direction: column; gap: 12px; }
-        .order-card { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; transition: border .2s; }
+        .order-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; transition: border .2s; }
         .order-card:hover { border-color: #6dcbeb; }
+        .order-top { display: flex; align-items: center; gap: 16px; }
         .order-emoji { font-size: 28px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #eef6fb; border-radius: 10px; }
         .order-info { flex: 1; }
         .order-id { font-weight: 600; font-size: 14px; }
@@ -1818,6 +2027,136 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .order-right { text-align: right; }
         .order-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
         .order-total { font-weight: 700; font-size: 15px; margin-top: 4px; color: #2a88b5; }
+        .order-actions-row { display: flex; justify-content: flex-end; }
+        .order-detail-toggle {
+          border: 1.5px solid #cfe4f2;
+          background: #f7fbfd;
+          color: #0a3a66;
+          font-size: 12px;
+          font-weight: 600;
+          border-radius: 8px;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: all .2s;
+        }
+        .order-detail-toggle:hover { border-color: #6dcbeb; background: #eef6fb; }
+
+        .order-detail-panel {
+          border-top: 1px solid #e6f0f7;
+          padding-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .order-meta-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .order-meta-card {
+          border: 1px solid #e6f0f7;
+          background: #f7fbfd;
+          border-radius: 10px;
+          padding: 10px 12px;
+        }
+        .order-meta-label {
+          font-size: 10px;
+          font-weight: 700;
+          color: #6a7a8a;
+          letter-spacing: .6px;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+        }
+        .order-meta-value {
+          font-size: 13px;
+          color: #0a2540;
+          font-weight: 600;
+          line-height: 1.4;
+        }
+
+        .order-shipping-box {
+          border: 1px solid #e6f0f7;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #ffffff;
+        }
+        .order-shipping-text {
+          font-size: 13px;
+          color: #1f3347;
+          font-weight: 500;
+          line-height: 1.5;
+          margin-bottom: 4px;
+        }
+        .order-shipping-sub {
+          font-size: 12px;
+          color: #6a7a8a;
+        }
+
+        .order-items-box {
+          border: 1px solid #e6f0f7;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #ffffff;
+        }
+        .order-items-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #0a2540;
+          margin-bottom: 8px;
+        }
+        .order-items-head,
+        .order-item-row {
+          display: grid;
+          grid-template-columns: minmax(120px, 1fr) 60px 95px 95px;
+          gap: 8px;
+          align-items: center;
+        }
+        .order-items-head {
+          font-size: 11px;
+          font-weight: 700;
+          color: #6a7a8a;
+          text-transform: uppercase;
+          letter-spacing: .5px;
+          padding: 0 0 8px;
+          border-bottom: 1px solid #edf4f9;
+        }
+        .order-item-row {
+          font-size: 13px;
+          color: #0a2540;
+          padding: 9px 0;
+          border-bottom: 1px dashed #edf4f9;
+        }
+        .order-item-row:last-child { border-bottom: none; }
+        .order-item-row span:nth-child(n+2),
+        .order-items-head span:nth-child(n+2) {
+          text-align: right;
+        }
+
+        .order-total-box {
+          margin-left: auto;
+          width: min(320px, 100%);
+          border: 1px solid #e6f0f7;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #f7fbfd;
+        }
+        .order-total-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          color: #3a4e60;
+          padding: 4px 0;
+        }
+        .order-total-row strong { color: #0a2540; }
+        .order-total-row.grand {
+          margin-top: 4px;
+          padding-top: 8px;
+          border-top: 1px solid #dbeaf2;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .order-total-row.grand strong { color: #2a88b5; }
 
         /* ── Wishlist ── */
         .wishlist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -1897,6 +2236,11 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           .pw-tips { grid-template-columns: 1fr; }
           .section-content { padding: 20px; }
           .edit-form { padding: 20px; }
+          .order-meta-grid { grid-template-columns: 1fr; }
+          .order-top { align-items: flex-start; }
+          .order-right { text-align: left; }
+          .order-items-head,
+          .order-item-row { grid-template-columns: minmax(110px, 1fr) 45px 85px 85px; font-size: 12px; }
         }
 
         @media (max-width: 400px) {

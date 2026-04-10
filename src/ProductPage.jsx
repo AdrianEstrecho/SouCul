@@ -8,7 +8,7 @@ import cloud2 from "./assets/3 1.png";
 import cloud3 from "./assets/3A.png";
 import cloud4 from "./assets/4A.png";
 
-import fallbackImage       from "./assets/no-image.webp";
+import fallbackImage       from "./assets/no-image.jpg";
 
 // ── Data (database-driven) ────────────────────────────────────────────────
 const CATEGORY_DESCRIPTIONS = {

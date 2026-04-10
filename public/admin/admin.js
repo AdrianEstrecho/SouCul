@@ -49,6 +49,8 @@ const pageSizeState = {
 const PROVINCES = ["Vigan", "Baguio", "Tagaytay", "Bohol", "Boracay"];
 const SUBCATS = ["Clothes", "Handicrafts", "Delicacies", "Decorations", "Homeware"];
 const ORDER_STATUSES = [
+  "cash_on_delivery_requested",
+  "online_payment_requested",
   "cash_on_delivery_approved",
   "online_payment_processed",
   "waiting_for_courier",
@@ -59,6 +61,10 @@ const ORDER_STATUSES = [
 ];
 const ORDER_FILTER_STATUS_MAP = {
   completed: "delivered",
+  cod_requested: "cash_on_delivery_requested",
+  "cod requested": "cash_on_delivery_requested",
+  online_requested: "online_payment_requested",
+  "online requested": "online_payment_requested",
   cod_approved: "cash_on_delivery_approved",
   "cod approved": "cash_on_delivery_approved",
   pending: "waiting_for_courier",
@@ -102,6 +108,8 @@ function splitFullName(fullName) {
 function getStatusBadge(status) {
   const s = String(status || "").toLowerCase();
   const badgeMap = {
+    cash_on_delivery_requested: "badge-pending",
+    online_payment_requested: "badge-processing",
     cash_on_delivery_approved: "badge-pending",
     online_payment_processed: "badge-processing",
     waiting_for_courier: "badge-processing",
@@ -641,6 +649,8 @@ async function renderDashboard() {
     });
 
     const statusOrder = [
+      "cash_on_delivery_requested",
+      "online_payment_requested",
       "cash_on_delivery_approved",
       "online_payment_processed",
       "waiting_for_courier",
@@ -1259,6 +1269,8 @@ async function updateOrderStatus() {
 
   const current = String(order.status || "").toLowerCase();
   const nextByStatus = {
+    cash_on_delivery_requested: "waiting_for_courier",
+    online_payment_requested: "waiting_for_courier",
     cash_on_delivery_approved: "waiting_for_courier",
     online_payment_processed: "waiting_for_courier",
     waiting_for_courier: "shipped",

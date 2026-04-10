@@ -12,11 +12,15 @@ $db = getDB();
 
 $stmt = $db->prepare("
     SELECT 
-        o.id, o.user_id, o.total_amount, o.status,
-        o.shipping_address, o.created_at,
-        CONCAT(u.first_name,' ',u.last_name) AS customer
+    o.id, o.order_number, o.user_id,
+    o.subtotal, o.tax_amount, o.shipping_cost, o.total_amount,
+    o.status, o.shipping_address, o.shipping_city, o.shipping_province, o.shipping_phone,
+    o.created_at,
+           p.payment_method, p.payment_status,
+           CONCAT(u.first_name,' ',u.last_name) AS customer
     FROM orders o
     LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN payments p ON p.order_id = o.id
     WHERE o.user_id = ? AND o.is_archived = 0
     ORDER BY o.created_at DESC
 ");

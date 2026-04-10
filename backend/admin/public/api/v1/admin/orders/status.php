@@ -7,6 +7,8 @@ $id   = (int) $_route['id'];
 requireFields($body, ['status']);
 
 $allowed = [
+    'cash_on_delivery_requested',
+    'online_payment_requested',
     'cash_on_delivery_approved',
     'online_payment_processed',
     'waiting_for_courier',
