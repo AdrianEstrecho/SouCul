@@ -25,3 +25,10 @@ jobs:
           publish_dir: ./backend
           publish_branch: backend
           force_orphan: false
+
+      - name: Trigger Hostinger backend deploy webhook
+        if: env.HOSTINGER_BACKEND_WEBHOOK_URL != ''
+        env:
+          HOSTINGER_BACKEND_WEBHOOK_URL: ${{ secrets.HOSTINGER_BACKEND_WEBHOOK_URL }}
+        run: |
+          curl --fail --show-error --silent "$HOSTINGER_BACKEND_WEBHOOK_URL"
