@@ -408,6 +408,15 @@ export default function SoulCul() {
             onLogout={handleLogout}
           />
         } />
+        <Route path="/ProductPage" element={
+          <ProductPage
+            userProfile={userProfile}
+            onUpdateProfile={setUserProfile}
+            cartCount={cartCount}
+            isLoggedIn={isLoggedIn}
+            onLogout={handleLogout}
+          />
+        } />
         <Route path="/AboutUs"     element={<AboutUs {...cartProps} />} />
 
         {/* Vigan */}
