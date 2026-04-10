@@ -37,7 +37,7 @@ import BoholHomeware from "./Bohol/Homeware";
 
 import AboutUs from "./Components/AboutUs";
 import Cart from "./Cart";
-import ProductPage from "./Components/ProductPage";
+import ProductPage from "./ProductPage";
 import Checkout from "./Checkout";
 import Profile from "./Profile";
 import Login from "./Login";

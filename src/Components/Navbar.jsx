@@ -40,7 +40,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const location = useLocation();
   const getActiveNav = () => {
     if (location.pathname === "/") return "Home";
-    if (location.pathname === "/Map") return "Products";
+    if (location.pathname === "/Products" || location.pathname === "/Map" || location.pathname === "/ProductPage") return "Products";
     if (location.pathname === "/AboutUs") return "About Us";
     if (location.pathname === "/Profile" || location.pathname === "/Cart" || location.pathname === "/Checkout") return null;
     return "Products";
@@ -195,7 +195,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
             onClick={() => {
               setActiveNav(item);
               if (item === "Home") { onGoHome ? onGoHome() : navigate("/"); }
-              if (item === "Products") navigate("/ProductPage");
+              if (item === "Products") navigate("/Products");
               if (item === "About Us") navigate("/AboutUs");
             }}
           >
