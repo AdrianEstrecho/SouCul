@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
 
@@ -8,76 +8,40 @@ import cloud2 from "./assets/3 1.png";
 import cloud3 from "./assets/3A.png";
 import cloud4 from "./assets/4A.png";
 
-import handwovenBasketsImg from "./assets/handwovenbaskets.png";
-import ubeJamImg           from "./assets/ubejam.png";
-import boracayBraceletsImg from "./assets/boracaybracelets.png";
-import calamayImg          from "./assets/Calamay.jpg";
-import bagsImg             from "./assets/bags.jpg";
-import baguioStrawberryImg from "./assets/Baguio Strawberry.webp";
-import kalesaImg           from "./assets/kalesa.jpg";
+import fallbackImage       from "./assets/Shirt.png";
 
-// Product grid images
-import burnayImg           from "./assets/burnay.png";
-import burnayPotteryImg    from "./assets/burnaypottery.jpg";
-import damiliImg           from "./assets/damili.png";
-import walletsImg          from "./assets/wallets.png";
-import burnayArtPrintsImg  from "./assets/burnayartprints.png";
-import furnituresImg       from "./assets/furnitures.png";
-import bibingkaImg         from "./assets/bibingka.png";
-import shirtImg            from "./assets/Shirt.png";
+// ── Data (database-driven) ────────────────────────────────────────────────
+const CATEGORY_DESCRIPTIONS = {
+  Handicrafts: "Keychains for memories, bringing a piece of the vacation spot with you.",
+  Clothes: "Designs made by local artists for street wear and casual wear.",
+  Decorations: "Designs made by local artists for street wear and casual wear.",
+  Homeware: "Designs made by local artists for street wear and casual wear.",
+  Delicacies: "Taste local food made with love and local ingredients.",
+};
 
-// ── Data ───────────────────────────────────────────────────────────────────
-const featuredProducts = [
-  { id: "f1", name: "Handwoven Baskets",     location: "Vigan",    price: 599,  imageUrl: handwovenBasketsImg, size: "lg" },
-  { id: "f2", name: "Ube Jam",               location: "Baguio",   price: 599,  imageUrl: ubeJamImg,           size: "md" },
-  { id: "f3", name: "Boracay Bracelet",      location: "Boracay",  price: 599,  imageUrl: boracayBraceletsImg, size: "lg" },
-  { id: "f4", name: "Calamay",               location: "Bohol",    price: 299,  imageUrl: calamayImg,          size: "sm" },
-  { id: "f5", name: "Tagaytay Bags",         location: "Tagaytay", price: 600,  imageUrl: bagsImg,             size: "ml" },
-  { id: "f6", name: "Baguio Strawberry Jam", location: "Baguio",   price: 399,  imageUrl: baguioStrawberryImg, size: "lg" },
-  { id: "f7", name: "Miniature Kalesa Model",location: "Vigan",    price: 1000, imageUrl: kalesaImg,           size: "sm" },
-];
+const CATEGORY_ORDER = ["Handicrafts", "Clothes", "Delicacies", "Decorations", "Homeware"];
+const FEATURED_SIZE_PATTERN = ["lg", "md", "lg", "sm", "ml", "lg", "sm"];
 
-const categories = [
-  { name: "Handicrafts", description: "Keychains for memories, bringing a piece of the vacation spot with you." },
-  { name: "Clothes",     description: "Designs made by local artists for street wear and casual wear." },
-  { name: "Decorations", description: "Designs made by local artists for street wear and casual wear." },
-  { name: "Homeware",    description: "Designs made by local artists for street wear and casual wear." },
-  { name: "Delicacies",  description: "Taste local food made with love and local ingredients." },
-];
+function resolveImageUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
 
-const products = [
-  { id: "p1",  name: "Burnay Pottery",        location: "Vigan",    price: 999,  imageUrl: burnayPotteryImg,   category: "Handicrafts" },
-  { id: "p2",  name: "Handwoven Baskets",     location: "Vigan",    price: 999,  imageUrl: handwovenBasketsImg,category: "Handicrafts" },
-  { id: "p3",  name: "Damili Pottery",        location: "Vigan",    price: 999,  imageUrl: damiliImg,          category: "Handicrafts" },
-  { id: "p4",  name: "Wallets",               location: "Vigan",    price: 999,  imageUrl: walletsImg,         category: "Handicrafts" },
-  { id: "p5",  name: "Buri Bags",             location: "Vigan",    price: 999,  imageUrl: bagsImg,            category: "Handicrafts" },
-  { id: "p6",  name: "Wood Coasters",         location: "Vigan",    price: 999,  imageUrl: burnayImg,          category: "Handicrafts" },
-  { id: "p7",  name: "Labba",                 location: "Vigan",    price: 999,  imageUrl: damiliImg,          category: "Handicrafts" },
-  { id: "p8",  name: "Bulatlat Pottery",      location: "Vigan",    price: 999,  imageUrl: burnayImg,          category: "Handicrafts" },
-  { id: "p9",  name: "Handwoven Rattan Bag",  location: "Bohol",    price: 999,  imageUrl: handwovenBasketsImg,category: "Handicrafts" },
-  { id: "p10", name: "Bamboo Coin Bank",      location: "Bohol",    price: 999,  imageUrl: walletsImg,         category: "Handicrafts" },
-  { id: "p11", name: "Wooden Carved Ashtray", location: "Bohol",    price: 999,  imageUrl: damiliImg,          category: "Handicrafts" },
-  { id: "p12", name: "Round Woven Box",       location: "Bohol",    price: 999,  imageUrl: burnayImg,          category: "Handicrafts" },
-  { id: "p13", name: "Bohol Coin Purse",      location: "Bohol",    price: 999,  imageUrl: walletsImg,         category: "Handicrafts" },
-  { id: "p14", name: "Handwoven Slippers",    location: "Bohol",    price: 999,  imageUrl: handwovenBasketsImg,category: "Handicrafts" },
-  { id: "p15", name: "Wooden Ref Magnet",     location: "Bohol",    price: 999,  imageUrl: damiliImg,          category: "Handicrafts" },
-  { id: "p16", name: "Bohol Wooden Keychain", location: "Bohol",    price: 999,  imageUrl: burnayImg,          category: "Handicrafts" },
-  { id: "p17", name: "Barong Tagalog",        location: "Vigan",    price: 1499, imageUrl: shirtImg,           category: "Clothes" },
-  { id: "p18", name: "Inabel Shirt",          location: "Baguio",   price: 899,  imageUrl: shirtImg,           category: "Clothes" },
-  { id: "p19", name: "Buko Pie",              location: "Tagaytay", price: 250,  imageUrl: calamayImg,         category: "Delicacies" },
-  { id: "p20", name: "Ube Halaya",            location: "Baguio",   price: 350,  imageUrl: ubeJamImg,          category: "Delicacies" },
-  { id: "p21", name: "Bibingka",              location: "Boracay",  price: 180,  imageUrl: bibingkaImg,        category: "Delicacies" },
-  { id: "p22", name: "Baguio Strawberry Jam", location: "Baguio",   price: 399,  imageUrl: baguioStrawberryImg,category: "Delicacies" },
-  { id: "p23", name: "Calamay",               location: "Bohol",    price: 299,  imageUrl: calamayImg,         category: "Delicacies" },
-  { id: "p24", name: "Capiz Shell Frame",     location: "Bohol",    price: 799,  imageUrl: burnayImg,          category: "Decorations" },
-  { id: "p25", name: "Parol Lantern",         location: "Tagaytay", price: 599,  imageUrl: damiliImg,          category: "Decorations" },
-  { id: "p26", name: "Burnay Art Prints",     location: "Vigan",    price: 450,  imageUrl: burnayArtPrintsImg, category: "Decorations" },
-  { id: "p27", name: "Banig Mat",             location: "Boracay",  price: 699,  imageUrl: handwovenBasketsImg,category: "Homeware" },
-  { id: "p28", name: "Clay Pot",              location: "Vigan",    price: 450,  imageUrl: burnayImg,          category: "Homeware" },
-  { id: "p29", name: "Rattan Furniture",      location: "Baguio",   price: 2499, imageUrl: furnituresImg,      category: "Homeware" },
-];
+  if (!value) return fallbackImage;
+  if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) return value;
+  if (value.startsWith("/")) return value;
+  return `/${value.replace(/^\/+/, "")}`;
+}
 
-const FILTERS = ["Handicrafts", "Clothes", "Delicacies", "Decorations", "Homeware"];
+function mapProduct(row) {
+  return {
+    id: Number(row.id),
+    name: row.name || "Product",
+    location: row.location_name || "SouCul",
+    price: Number(row.discount_price ?? row.price ?? 0),
+    imageUrl: resolveImageUrl(row.featured_image_url),
+    category: row.category_name || "Uncategorized",
+    isFeatured: Boolean(Number(row.is_featured ?? 0)),
+  };
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────
 const CloseIcon = () => (
@@ -335,9 +299,101 @@ function ProdCard({ product, onSelect }) {
 // ── Main Page ─────────────────────────────────────────────────────────────
 export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }) {
   const navigate = useNavigate();
-  const [activeFilter, setActiveFilter] = useState("Handicrafts");
+  const [activeFilter, setActiveFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productError, setProductError] = useState("");
+
+  const filterOptions = useMemo(() => {
+    const seen = new Set();
+    const unique = [];
+
+    for (const product of products) {
+      const name = String(product.category || "").trim();
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      unique.push(name);
+    }
+
+    const prioritized = CATEGORY_ORDER.filter((name) => seen.has(name));
+    const dynamic = unique.filter((name) => !CATEGORY_ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
+    return [...prioritized, ...dynamic];
+  }, [products]);
+
+  const featuredCarouselProducts = useMemo(() => {
+    return featuredProducts.map((product, index) => ({
+      ...product,
+      size: FEATURED_SIZE_PATTERN[index % FEATURED_SIZE_PATTERN.length],
+    }));
+  }, [featuredProducts]);
+
+  const categoryCards = useMemo(
+    () => filterOptions.map((name) => ({
+      name,
+      description: CATEGORY_DESCRIPTIONS[name] || "Discover locally crafted products from this category.",
+    })),
+    [filterOptions]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      setProductError("");
+
+      try {
+        const api = window.CustomerAPI || window.customerAPI;
+        if (!api || typeof api.getProducts !== "function") {
+          throw new Error("Customer API client is unavailable.");
+        }
+
+        const [allResponse, featuredResponse] = await Promise.all([
+          api.getProducts({ page: 1, per_page: 500 }),
+          api.getProducts({ featured: 1, page: 1, per_page: 20 }),
+        ]);
+
+        const allRows = Array.isArray(allResponse?.data) ? allResponse.data : [];
+        const featuredRows = Array.isArray(featuredResponse?.data) ? featuredResponse.data : [];
+        const mapped = allRows.map(mapProduct);
+        const mappedFeatured = featuredRows.map(mapProduct);
+
+        if (!isMounted) return;
+        setProducts(mapped);
+        setFeaturedProducts(mappedFeatured);
+      } catch (error) {
+        console.error("Failed to load products from database:", error);
+        if (!isMounted) return;
+        setProducts([]);
+        setFeaturedProducts([]);
+        setProductError("Unable to load products from the database right now.");
+      } finally {
+        if (isMounted) {
+          setLoadingProducts(false);
+        }
+      }
+    };
+
+    loadProducts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!filterOptions.length) {
+      if (activeFilter) setActiveFilter("");
+      return;
+    }
+
+    if (!activeFilter || !filterOptions.includes(activeFilter)) {
+      setActiveFilter(filterOptions[0]);
+    }
+  }, [filterOptions, activeFilter]);
 
   const addToCart = (product) => {
     onAddToCart({ ...product, image: product.imageUrl });
@@ -349,7 +405,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
   };
 
   const filtered = products.filter(p =>
-    p.category === activeFilter &&
+    (!activeFilter || p.category === activeFilter) &&
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -633,14 +689,18 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         </div>
 
         <div className="pp-carousel-outer">
-          <FeaturedCarousel products={featuredProducts} onSelect={setSelectedProduct} />
+          {featuredCarouselProducts.length > 0 ? (
+            <FeaturedCarousel products={featuredCarouselProducts} onSelect={setSelectedProduct} />
+          ) : (
+            <div className="empty-state">{loadingProducts ? "Loading featured products from database..." : "No featured products available yet."}</div>
+          )}
         </div>
       </section>
 
       {/* ── Categories ───────────────────────────────────────────────── */}
       <section className="cat-section">
         <Marquee speed={30}>
-          {categories.map((c, i) => (
+          {categoryCards.map((c, i) => (
             <div key={i} className="cat-card">
               <h3>{c.name}</h3>
               <p>{c.description}</p>
@@ -652,7 +712,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
       {/* ── Filters ──────────────────────────────────────────────────── */}
       <section className="filter-section">
         <div className="filter-inner">
-          {FILTERS.map(f => (
+          {filterOptions.map(f => (
             <button
               key={f}
               className={`filter-btn ${activeFilter === f ? "filter-btn-active" : "filter-btn-inactive"}`}
@@ -681,10 +741,14 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
       <section className="products-section">
         <div className="products-inner">
           <div className="products-header">
-            <h2>{activeFilter}</h2>
+            <h2>{activeFilter || "Products"}</h2>
             <div className="products-divider" />
           </div>
-          {filtered.length > 0
+          {loadingProducts
+            ? <div className="empty-state">Loading products from database...</div>
+            : productError
+            ? <div className="empty-state">{productError}</div>
+            : filtered.length > 0
             ? (() => {
                 const byProvince = filtered.reduce((acc, p) => {
                   if (!acc[p.location]) acc[p.location] = [];
