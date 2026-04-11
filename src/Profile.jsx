@@ -57,6 +57,33 @@ const statusColor = {
   cancelled: { bg: "#fee2e2", color: "#991b1b" },
 };
 
+const ORDER_STATUS_LABELS = {
+  online_payment_requested: "Pending Payment",
+  online_payment_processed: "Payment Confirmed",
+  cash_on_delivery_requested: "COD Requested",
+  cash_on_delivery_approved: "COD Confirmed",
+  processing: "Processing",
+  waiting_for_courier: "Waiting for Courier",
+  shipped: "Shipped",
+  to_be_delivered: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  pending: "Pending Payment",
+  confirmed: "Payment Confirmed",
+};
+
+const normalizeOrderStatus = (value) => String(value || "").toLowerCase().trim();
+
+const canCancelOrderStatus = (value) => {
+  const normalized = normalizeOrderStatus(value);
+  return normalized !== "delivered" && normalized !== "cancelled";
+};
+
+const formatOrderStatusLabel = (value) => {
+  const normalized = normalizeOrderStatus(value);
+  return ORDER_STATUS_LABELS[normalized] || formatStatus(normalized || "pending");
+};
+
 const EMPTY_STATE_STYLE = { fontSize: 13, color: "#888", padding: "8px 0" };
 const DEFAULT_NOTIFICATION_SETTINGS = { orders: true, promos: true, wishlist: false, newsletter: false, sms: true };
 
@@ -591,7 +618,7 @@ function ProfileDetailsSection({ user, photo, stats, onEdit, onChangePhoto }) {
       <div className="pd-avatar-block">
         <div className="pd-avatar" onClick={onChangePhoto}>
           {photo ? <img src={photo} alt="avatar" className="pd-avatar-img" /> : initials}
-          <div className="avatar-cam"><Icon d={icons.camera} size={12} /></div>
+          <div className="avatar-cam" style={{ zIndex: 1 }}><Icon d={icons.camera} size={12} /></div>
         </div>
         <div>
           <div className="pd-avatar-name">{safeText(user.name, "Customer")}</div>
@@ -600,7 +627,7 @@ function ProfileDetailsSection({ user, photo, stats, onEdit, onChangePhoto }) {
         </div>
       </div>
       <div className="pd-details-grid">
-        {details.map(({ label, value, emoji }) => (
+        {details.map(({ label, value, emoji }) => ( 
           <div key={label} className="pd-detail-card">
             <div className="pd-detail-emoji">{emoji}</div>
             <div className="pd-detail-body">
@@ -632,6 +659,9 @@ function OrdersSection() {
   const [orderDetailsById, setOrderDetailsById] = useState({});
   const [detailLoadingId, setDetailLoadingId] = useState(null);
   const [detailErrorsById, setDetailErrorsById] = useState({});
+  const [cancelingOrderId, setCancelingOrderId] = useState(null);
+  const [cancelErrorsById, setCancelErrorsById] = useState({});
+  const [orderActionToast, setOrderActionToast] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -659,6 +689,16 @@ function OrdersSection() {
     loadOrders();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!orderActionToast) return undefined;
+
+    const timer = setTimeout(() => {
+      setOrderActionToast("");
+    }, 2600);
+
+    return () => clearTimeout(timer);
+  }, [orderActionToast]);
 
   const loadOrderDetails = async (orderId) => {
     setDetailLoadingId(orderId);
@@ -697,21 +737,82 @@ function OrdersSection() {
     }
   };
 
+  const cancelOrder = async (orderId, rawStatus) => {
+    const status = normalizeOrderStatus(rawStatus);
+    if (!canCancelOrderStatus(status)) {
+      setCancelErrorsById((prev) => ({
+        ...prev,
+        [orderId]: "This order can no longer be cancelled.",
+      }));
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to cancel this order?");
+    if (!confirmed) return;
+
+    setCancelingOrderId(orderId);
+    setCancelErrorsById((prev) => ({ ...prev, [orderId]: "" }));
+
+    try {
+      if (!customerAPI || typeof customerAPI.updateOrderStatus !== "function") {
+        throw new Error("Order status API is unavailable.");
+      }
+
+      const currentOrder = orders.find((order) => Number(order.id) === Number(orderId));
+      const orderLabel = currentOrder?.order_number ? String(currentOrder.order_number) : `#${orderId}`;
+
+      const result = await customerAPI.updateOrderStatus(orderId, "cancelled");
+      const nextStatus = normalizeOrderStatus(result?.data?.status || "cancelled");
+
+      setOrders((prev) => prev.map((order) => (
+        Number(order.id) === Number(orderId)
+          ? { ...order, status: nextStatus }
+          : order
+      )));
+
+      setOrderDetailsById((prev) => {
+        const detail = prev[orderId];
+        if (!detail || typeof detail !== "object") return prev;
+
+        return {
+          ...prev,
+          [orderId]: {
+            ...detail,
+            status: nextStatus,
+          },
+        };
+      });
+
+      setOrderActionToast(`Order ${orderLabel} was cancelled successfully.`);
+    } catch (error) {
+      setCancelErrorsById((prev) => ({
+        ...prev,
+        [orderId]: error?.message || "Failed to cancel order.",
+      }));
+    } finally {
+      setCancelingOrderId((prev) => (prev === orderId ? null : prev));
+    }
+  };
+
   return (
     <div className="section-content">
       <h3 className="section-title">My Orders</h3>
+      {orderActionToast && <div className="order-action-toast">{orderActionToast}</div>}
       {isLoading && <div style={EMPTY_STATE_STYLE}>Loading orders...</div>}
       {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
       {!isLoading && !loadError && orders.length === 0 && <div style={EMPTY_STATE_STYLE}>No orders yet.</div>}
       <div className="orders-list">
         {orders.map((o) => {
-          const rawStatus = String(o.status || "pending").toLowerCase();
+          const rawStatus = normalizeOrderStatus(o.status || "pending");
           const statusStyle = statusColor[rawStatus] || statusColor.pending;
           const orderLabel = o.order_number ? String(o.order_number) : `#${o.id}`;
           const isExpanded = expandedOrderId === o.id;
           const detail = orderDetailsById[o.id];
           const detailError = detailErrorsById[o.id] || "";
           const detailLoading = detailLoadingId === o.id;
+          const canCancel = canCancelOrderStatus(rawStatus);
+          const cancelError = cancelErrorsById[o.id] || "";
+          const isCanceling = cancelingOrderId === o.id;
 
           const items = Array.isArray(detail?.items) ? detail.items : [];
           const computedSubtotal = items.reduce(
@@ -735,15 +836,9 @@ function OrdersSection() {
             resolvedPaymentMethod
           );
 
-          const displayStatusLabel = (() => {
-            if (rawStatus === "online_payment_requested") {
-              return `Paid by ${paymentMethodLabel}`;
-            }
-            if (rawStatus === "cash_on_delivery_requested") {
-              return "Cash on Delivery requested";
-            }
-            return formatStatus(rawStatus);
-          })();
+          const displayStatusLabel = formatOrderStatusLabel(rawStatus);
+
+          const detailStatusRaw = normalizeOrderStatus(detail?.status || rawStatus);
 
           const paymentStatusRaw = String(detail?.payment?.payment_status || "").toLowerCase();
           const paymentStatusLabel = getPaymentStatusLabel({
@@ -770,7 +865,17 @@ function OrdersSection() {
               <button className="order-detail-toggle" onClick={() => toggleOrderDetails(o.id)}>
                 {isExpanded ? "Hide Details" : "View Details"}
               </button>
+              {canCancel && (
+                <button
+                  className="order-cancel-btn"
+                  onClick={() => cancelOrder(o.id, rawStatus)}
+                  disabled={isCanceling}
+                >
+                  {isCanceling ? "Cancelling..." : "Cancel Order"}
+                </button>
+              )}
             </div>
+            {cancelError && <div className="order-action-feedback">{cancelError}</div>}
 
             {isExpanded && (
               <div className="order-detail-panel">
@@ -789,6 +894,10 @@ function OrdersSection() {
                       <div className="order-meta-card">
                         <div className="order-meta-label">Order Date</div>
                         <div className="order-meta-value">{safeDateTimeLabel(detail.created_at || o.created_at)}</div>
+                      </div>
+                      <div className="order-meta-card">
+                        <div className="order-meta-label">Order Status</div>
+                        <div className="order-meta-value">{formatOrderStatusLabel(detailStatusRaw)}</div>
                       </div>
                       <div className="order-meta-card">
                         <div className="order-meta-label">Payment Method</div>
@@ -2078,7 +2187,7 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .order-right { text-align: right; }
         .order-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
         .order-total { font-weight: 700; font-size: 15px; margin-top: 4px; color: #2a88b5; }
-        .order-actions-row { display: flex; justify-content: flex-end; }
+        .order-actions-row { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
         .order-detail-toggle {
           border: 1.5px solid #cfe4f2;
           background: #f7fbfd;
@@ -2091,6 +2200,44 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           transition: all .2s;
         }
         .order-detail-toggle:hover { border-color: #6dcbeb; background: #eef6fb; }
+
+        .order-cancel-btn {
+          border: 1.5px solid #fecaca;
+          background: #fff5f5;
+          color: #b91c1c;
+          font-size: 12px;
+          font-weight: 700;
+          border-radius: 8px;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: all .2s;
+        }
+        .order-cancel-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+        .order-cancel-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .order-action-feedback {
+          margin-top: -4px;
+          font-size: 12px;
+          color: #b91c1c;
+          text-align: right;
+        }
+
+        .order-action-toast {
+          margin-bottom: 12px;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid #86efac;
+          background: #f0fdf4;
+          color: #166534;
+          font-size: 13px;
+          font-weight: 600;
+          animation: fadeToastIn .2s ease;
+        }
+
+        @keyframes fadeToastIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .order-detail-panel {
           border-top: 1px solid #e6f0f7;

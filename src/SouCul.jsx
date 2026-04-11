@@ -39,6 +39,7 @@ import AboutUs from "./Components/AboutUs";
 import Cart from "./Cart";
 import ProductPage from "./ProductPage";
 import Checkout from "./Checkout";
+import PaymentProcessing from "./PaymentProcessing";
 import Profile from "./Profile";
 import Login from "./Login";
 import { getCookie, getJsonCookie, removeCookie, setCookie } from "./utils/cookieState";
@@ -550,6 +551,11 @@ export default function Soucul() {
             onClearDirectCheckout={() => setDirectCheckoutItem(null)}
             onOrderPlaced={handleOrderPlaced}
           />
+          )
+        } />
+        <Route path="/Checkout/payment-processing" element={
+          renderProtected(
+          <PaymentProcessing cartCount={cartCount} />
           )
         } />
         <Route path="/Profile" element={
