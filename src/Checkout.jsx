@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
+import fallbackImage from "./assets/no-image.jpg";
 
 const formatCard = (v) =>
   v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
@@ -8,6 +9,11 @@ const formatCard = (v) =>
 const formatExpiry = (v) => {
   const d = v.replace(/\D/g, "").slice(0, 4);
   return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d;
+};
+
+const resolveItemImage = (rawUrl) => {
+  const value = String(rawUrl || "").trim();
+  return value || fallbackImage;
 };
 
 export default function Checkout({ cartItems, cartCount, userProfile, directCheckoutItem, onClearDirectCheckout, onOrderPlaced }) {
@@ -346,7 +352,14 @@ const handlePlaceOrder = async (e) => {
               {items.map((item) => (
                 <div key={item.cartId} className="checkout-item">
                   <div className="checkout-item-img">
-                    <img src={item.image} alt={item.name} />
+                    <img
+                      src={resolveItemImage(item.image)}
+                      alt={item.name}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = fallbackImage;
+                      }}
+                    />
                   </div>
                   <div className="checkout-item-info">
                     <div className="checkout-item-name">{item.name}</div>

@@ -44,6 +44,26 @@ import Login from "./Login";
 import { getCookie, getJsonCookie, removeCookie, setCookie } from "./utils/cookieState";
 
 const GUEST_PROFILE = { name: "Guest", email: "", phone: "", birthday: "", gender: "", profileImage: "", createdAt: "" };
+const PRODUCT_IMAGE_CACHE_KEY = "soucul_product_image_cache";
+
+const loadProductImageCache = () => {
+  try {
+    const raw = localStorage.getItem(PRODUCT_IMAGE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeProductImageCache = (cache) => {
+  try {
+    localStorage.setItem(PRODUCT_IMAGE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore storage failures; cart can still render from API data.
+  }
+};
 
 // ── Login Required Modal ──
 function LoginRequiredModal({ onClose, onGoToLogin }) {
@@ -95,6 +115,7 @@ export default function Soucul() {
   });
   const [isGuest, setIsGuest] = useState(() => getCookie("soucul_currentUser") === "guest");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [productImageCache, setProductImageCache] = useState(() => loadProductImageCache());
   const [userProfile, setUserProfile] = useState(() => {
     const currentUser = getCookie("soucul_currentUser");
     const tokenUser = getJsonCookie("customer_user", null);
@@ -163,16 +184,39 @@ export default function Soucul() {
     return `/${value.replace(/^\/+/, "")}`;
   };
 
-  const toCartItem = (row) => ({
-    cartId: Number(row.id),
-    id: Number(row.product_id),
-    name: row.name || "Product",
-    location: row.location_name || "SouCul",
-    image: resolveImageUrl(row.featured_image_url),
-    price: Number(row.discount_price ?? row.price ?? 0),
-    qty: Math.max(1, Number(row.quantity || 1)),
-    checked: false,
-  });
+  const rememberProductImage = (productId, rawUrl) => {
+    const id = Number(productId);
+    const nextImage = resolveImageUrl(rawUrl);
+    if (!Number.isFinite(id) || !nextImage) return;
+
+    setProductImageCache((prev) => {
+      if (prev[id] === nextImage) return prev;
+      const next = { ...prev, [id]: nextImage };
+      writeProductImageCache(next);
+      return next;
+    });
+  };
+
+  const toCartItem = (row, imageCache = productImageCache) => {
+    const productId = Number(row.product_id);
+
+    return {
+      cartId: Number(row.id),
+      id: productId,
+      name: row.name || "Product",
+      location: row.location_name || "SouCul",
+      image: resolveImageUrl(
+        row.featured_image_url ||
+        row.product_image_url ||
+        row.image_url ||
+        row.image ||
+        imageCache[productId]
+      ),
+      price: Number(row.discount_price ?? row.price ?? 0),
+      qty: Math.max(1, Number(row.quantity || 1)),
+      checked: false,
+    };
+  };
 
   const hydrateCartFromAPI = async () => {
     const api = getCustomerApi();
@@ -180,7 +224,30 @@ export default function Soucul() {
 
     const result = await api.getCart();
     const rows = Array.isArray(result?.data) ? result.data : [];
-    setCartItems(rows.map(toCartItem));
+    const nextCache = { ...productImageCache };
+    let cacheChanged = false;
+
+    rows.forEach((row) => {
+      const productId = Number(row.product_id);
+      const image = resolveImageUrl(
+        row.featured_image_url ||
+        row.product_image_url ||
+        row.image_url ||
+        row.image
+      );
+
+      if (Number.isFinite(productId) && image && nextCache[productId] !== image) {
+        nextCache[productId] = image;
+        cacheChanged = true;
+      }
+    });
+
+    if (cacheChanged) {
+      setProductImageCache(nextCache);
+      writeProductImageCache(nextCache);
+    }
+
+    setCartItems(rows.map((row) => toCartItem(row, cacheChanged ? nextCache : productImageCache)));
   };
 
   useEffect(() => {
@@ -310,6 +377,7 @@ export default function Soucul() {
     }
 
     try {
+      rememberProductImage(product.id, product.image || product.imageUrl);
       const api = getCustomerApi();
       await api.addToCart(product.id, product.qty || 1);
       await hydrateCartFromAPI();
