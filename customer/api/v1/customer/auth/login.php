@@ -22,14 +22,6 @@ $token = jwtEncodeWithExpiry([
     'email'   => $user['email'],
 ], CUSTOMER_INACTIVITY_TIMEOUT_SECONDS);
 
-createCustomerNotification(
-    $db,
-    (int) $user['id'],
-    'Login detected',
-    'You logged in to your account successfully.',
-    'login'
-);
-
 success([
     'token' => $token,
     'user' => [
