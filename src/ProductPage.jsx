@@ -31,6 +31,16 @@ function resolveImageUrl(rawUrl) {
   return `/${value.replace(/^\/+/, "")}`;
 }
 
+function normalizeSizeTier(rawTier) {
+  const tier = String(rawTier || "").trim().toLowerCase();
+  return ["small", "medium", "large", "special"].includes(tier) ? tier : null;
+}
+
+function formatSizeTier(tier) {
+  if (!tier) return "";
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
+
 function mapProduct(row) {
   return {
     id: Number(row.id),
@@ -43,6 +53,7 @@ function mapProduct(row) {
     rating: Number(row.rating_average ?? 0),
     category: row.category_name || "Uncategorized",
     isFeatured: Boolean(Number(row.is_featured ?? 0)),
+    sizeTier: normalizeSizeTier(row.size_tier),
   };
 }
 
@@ -335,6 +346,7 @@ const sizeMap = {
 
 function FeatCard({ product, onSelect }) {
   const s = sizeMap[product.size] || sizeMap.md;
+  const sizeTierLabel = formatSizeTier(product.sizeTier);
   return (
     <div className="feat-card" style={{ height: s.height }}>
       <div className="feat-card-img" style={{ height: s.imgH }}>
@@ -342,6 +354,7 @@ function FeatCard({ product, onSelect }) {
         <div className="feat-card-overlay" />
         <div className="feat-card-label">
           <h3>{product.name}</h3>
+          {sizeTierLabel && <span className="feat-size-tier">{sizeTierLabel}</span>}
           <p>{product.location}</p>
         </div>
       </div>
@@ -373,6 +386,7 @@ function FeaturedCarousel({ products, onSelect }) {
 
 // ── Product Card ──────────────────────────────────────────────────────────
 function ProdCard({ product, onSelect }) {
+  const sizeTierLabel = formatSizeTier(product.sizeTier);
   return (
     <div className="prod-card">
       <div className="prod-img-wrap" onClick={() => onSelect(product)} style={{ cursor: "pointer" }}>
@@ -380,6 +394,7 @@ function ProdCard({ product, onSelect }) {
       </div>
       <div className="prod-info">
         <h3>{product.name}</h3>
+        {sizeTierLabel && <span className="prod-size-tier">{sizeTierLabel}</span>}
         <p>{product.location}</p>
       </div>
       <div className="prod-actions">
@@ -666,6 +681,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         .feat-card-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%); border-radius: 27px; }
         .feat-card-label { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 16px; }
         .feat-card-label h3 { color: #fff; font-weight: 500; font-size: 18px; margin-bottom: 4px; }
+        .feat-size-tier { color: #FACC15; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
         .feat-card-label p  { color: #fff; font-weight: 500; font-size: 15px; }
         .feat-card-actions  { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 0 4px; margin-top: auto; flex-shrink: 0; }
         .feat-price-btn { flex: 1; height: 45px; background: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 17px; color: #000; border: none; cursor: pointer; transition: background 0.2s; font-family: 'Inter', sans-serif; }
@@ -709,6 +725,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         .prod-card:hover .prod-img-wrap img { transform: scale(1.1); }
         .prod-info { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: auto; padding: 0 8px; }
         .prod-info h3 { font-weight: 500; font-size: 18px; color: #000; line-height: 1.2; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; font-family: 'Inter', sans-serif; }
+        .prod-size-tier { color: var(--teal-dark); font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
         .prod-info p  { font-weight: 500; font-size: 15px; color: #000; font-family: 'Inter', sans-serif; }
         .prod-actions { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 4px 4px; gap: 8px; }
         .prod-price-btn { flex: 1; height: 40px; background: var(--green-accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 18px; color: #000; box-shadow: var(--shadow-green); border: none; cursor: pointer; font-family: 'Inter', sans-serif; transition: filter 0.2s, transform 0.1s; }
@@ -862,7 +879,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
                       <h3 className="province-title">{province}</h3>
                     </div>
                     <div className="products-grid">
-                      {items.map((p, i) => <ProdCard key={i} product={p} onSelect={setSelectedProduct} />)}
+                      {items.map((p) => <ProdCard key={p.id} product={p} onSelect={setSelectedProduct} />)}
                     </div>
                   </div>
                 ));
