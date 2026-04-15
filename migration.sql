@@ -85,6 +85,11 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS material VARCHAR(120) NOT NULL DEFAULT 'Locally sourced'
   AFTER description;
 
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS size_tier ENUM('small', 'medium', 'large', 'special')
+  NOT NULL DEFAULT 'medium'
+  AFTER price;
+
 UPDATE products
 SET material = 'Locally sourced'
 WHERE material IS NULL OR TRIM(material) = '';
@@ -611,7 +616,12 @@ FROM (
 ) p
 JOIN locations l ON l.slug = p.location_slug
 JOIN categories c ON c.slug = p.category_slug
-JOIN admins a ON a.email = 'admin@soucul.com'
+JOIN (
+  SELECT id
+  FROM admins
+  ORDER BY (email = 'admin@soucul.com') DESC, id ASC
+  LIMIT 1
+) a
 ;
 
 -- ── 9. SEED: TEST USERS ──────────────────────────────────────────────────

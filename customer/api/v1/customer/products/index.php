@@ -141,6 +141,7 @@ $stmt = $db->prepare("
            " . $optionalProductField('description', "''") . ",
            " . $optionalProductField('material', "''") . ",
            " . $optionalProductField('price', '0') . ",
+           " . $optionalProductField('size_tier', 'NULL') . ",
            " . $optionalProductField('discount_price', 'NULL') . ",
            " . $optionalProductField('featured_image_url', "''") . ",
            " . $optionalProductField('quantity_in_stock', '0') . ",
