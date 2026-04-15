@@ -196,6 +196,52 @@ export default function Login({ onLogin}) {
     clearResetTokenFromUrl();
   };
 
+  const requestForgotPassword = async (email) => {
+    const api = window.CustomerAPI;
+    if (!api) {
+      throw new Error("Customer API is unavailable.");
+    }
+
+    if (typeof api.forgotPassword === "function") {
+      return api.forgotPassword(email);
+    }
+
+    if (typeof api.request === "function") {
+      return api.request("/api/v1/customer/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        skipAuth: true,
+      });
+    }
+
+    throw new Error("Forgot password service is unavailable.");
+  };
+
+  const requestResetPassword = async (token, password, confirmPassword) => {
+    const api = window.CustomerAPI;
+    if (!api) {
+      throw new Error("Customer API is unavailable.");
+    }
+
+    if (typeof api.resetPassword === "function") {
+      return api.resetPassword(token, password, confirmPassword);
+    }
+
+    if (typeof api.request === "function") {
+      return api.request("/api/v1/customer/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({
+          token,
+          password,
+          confirm_password: confirmPassword,
+        }),
+        skipAuth: true,
+      });
+    }
+
+    throw new Error("Reset password service is unavailable.");
+  };
+
   const handleForgot = async (e) => {
     e.preventDefault();
     if (!forgotEmail.trim()) { setForgotError("Please enter your email address."); return; }
@@ -204,8 +250,7 @@ export default function Login({ onLogin}) {
     setForgotMsg({ type: "info", text: "Sending reset link..." });
 
     try {
-      const api = window.CustomerAPI;
-      const result = await api.forgotPassword(forgotEmail.trim());
+      const result = await requestForgotPassword(forgotEmail.trim());
       setForgotMsg({ type: "success", text: result?.message || "If this email exists, a reset link will be sent." });
     } catch (err) {
       setForgotMsg({ type: "error", text: err?.message || "Unable to send reset link. Please try again." });
@@ -238,8 +283,7 @@ export default function Login({ onLogin}) {
     setResetMsg({ type: "info", text: "Updating password..." });
 
     try {
-      const api = window.CustomerAPI;
-      const result = await api.resetPassword(resetToken.trim(), resetForm.password, resetForm.confirm);
+      const result = await requestResetPassword(resetToken.trim(), resetForm.password, resetForm.confirm);
 
       setResetMsg({ type: "success", text: result?.message || "Password has been reset successfully." });
       setLoginMsg({ type: "success", text: "Password updated. You can now log in." });
