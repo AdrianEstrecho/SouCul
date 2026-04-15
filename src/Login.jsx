@@ -1,5 +1,16 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+/*
+Estrecho, Adrian M.
+Mansilla, Rhangel R.
+Romualdo, Jervin Paul C.
+Sostea, Joana Marie A.
+Torres, Ceazarion Sean Nicholas M.
+Tupaen, Arianne Kaye E.
+
+BSIT/IT22S1
+*/
+
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import mapBg from "./assets/mapbg.png";
 
 const PW_RULES = [
@@ -12,8 +23,10 @@ const PW_RULES = [
 
 export default function Login({ onLogin}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [view, setView] = useState("login"); // "login" | "signup"
   const [showForgot, setShowForgot] = useState(false);
+  const [showReset, setShowReset] = useState(false);
   const [showTos, setShowTos] = useState(false);
 
   // Login state
@@ -39,6 +52,31 @@ export default function Login({ onLogin}) {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotError, setForgotError] = useState("");
   const [forgotMsg, setForgotMsg] = useState(null);
+
+  // Reset password state
+  const [resetToken, setResetToken] = useState("");
+  const [resetForm, setResetForm] = useState({ password: "", confirm: "" });
+  const [resetErrors, setResetErrors] = useState({});
+  const [resetMsg, setResetMsg] = useState(null);
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [showResetConfirmPw, setShowResetConfirmPw] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tokenFromUrl = (params.get("reset_token") || "").trim();
+
+    if (!tokenFromUrl) {
+      return;
+    }
+
+    setView("login");
+    setShowForgot(false);
+    setShowReset(true);
+    setResetToken(tokenFromUrl);
+    setResetForm({ password: "", confirm: "" });
+    setResetErrors({});
+    setResetMsg(null);
+  }, [location.search]);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -139,12 +177,79 @@ export default function Login({ onLogin}) {
   };
 
   // ── Forgot ──
-  const handleForgot = (e) => {
+  const clearResetTokenFromUrl = () => {
+    const params = new URLSearchParams(location.search);
+    if (!params.has("reset_token")) return;
+
+    params.delete("reset_token");
+    const search = params.toString();
+    navigate({ pathname: "/Login", search: search ? `?${search}` : "" }, { replace: true });
+  };
+
+  const closeResetModal = () => {
+    setShowReset(false);
+    setResetForm({ password: "", confirm: "" });
+    setResetErrors({});
+    setResetMsg(null);
+    setShowResetPw(false);
+    setShowResetConfirmPw(false);
+    clearResetTokenFromUrl();
+  };
+
+  const handleForgot = async (e) => {
     e.preventDefault();
     if (!forgotEmail.trim()) { setForgotError("Please enter your email address."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) { setForgotError("Please enter a valid email address."); return; }
     setForgotError("");
-    setForgotMsg({ type: "success", text: "If this email exists, a reset link will be sent." });
+    setForgotMsg({ type: "info", text: "Sending reset link..." });
+
+    try {
+      const api = window.CustomerAPI;
+      const result = await api.forgotPassword(forgotEmail.trim());
+      setForgotMsg({ type: "success", text: result?.message || "If this email exists, a reset link will be sent." });
+    } catch (err) {
+      setForgotMsg({ type: "error", text: err?.message || "Unable to send reset link. Please try again." });
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+
+    const errors = {};
+    if (!resetToken.trim()) {
+      errors.token = "Reset link is invalid or missing token.";
+    }
+
+    if (!resetForm.password) {
+      errors.password = "New password is required.";
+    } else if (!PW_RULES.every((rule) => rule.test(resetForm.password))) {
+      errors.password = "Password does not meet all requirements.";
+    }
+
+    if (!resetForm.confirm) {
+      errors.confirm = "Please confirm your new password.";
+    } else if (resetForm.confirm !== resetForm.password) {
+      errors.confirm = "Passwords do not match.";
+    }
+
+    setResetErrors(errors);
+    if (Object.keys(errors).length) return;
+
+    setResetMsg({ type: "info", text: "Updating password..." });
+
+    try {
+      const api = window.CustomerAPI;
+      const result = await api.resetPassword(resetToken.trim(), resetForm.password, resetForm.confirm);
+
+      setResetMsg({ type: "success", text: result?.message || "Password has been reset successfully." });
+      setLoginMsg({ type: "success", text: "Password updated. You can now log in." });
+
+      setTimeout(() => {
+        closeResetModal();
+      }, 1000);
+    } catch (err) {
+      setResetMsg({ type: "error", text: err?.message || "Unable to reset password. Please try again." });
+    }
   };
 
   return (
@@ -331,6 +436,72 @@ export default function Login({ onLogin}) {
               <div className="auth-footer-text" style={{ marginTop: 14 }}>
                 Remembered? <a onClick={() => setShowForgot(false)}>Back to Login</a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reset Password Modal ── */}
+      {showReset && (
+        <div className="auth-modal-overlay" onClick={(e) => e.target === e.currentTarget && closeResetModal()}>
+          <div className="auth-modal-wrapper auth-fade-in">
+            <div className="auth-logo">S</div>
+            <div className="auth-modal-card">
+              <span className="auth-modal-close" onClick={closeResetModal}>&times;</span>
+              <h2 className="auth-title">Reset Password</h2>
+              <p className="auth-subtitle">Set your new password for your account</p>
+
+              <form onSubmit={handleResetPassword}>
+                {resetErrors.token && <span className="auth-field-error">{resetErrors.token}</span>}
+
+                <div className="auth-input-group">
+                  <span className="auth-icon-left">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                  <input
+                    type={showResetPw ? "text" : "password"}
+                    placeholder="New Password"
+                    className={resetErrors.password ? "auth-error-field" : ""}
+                    value={resetForm.password}
+                    onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })}
+                  />
+                  <span className="auth-icon-right" onClick={() => setShowResetPw(!showResetPw)}>
+                    {showResetPw ? "Hide" : "Show"}
+                  </span>
+                </div>
+                {resetErrors.password && <span className="auth-field-error">{resetErrors.password}</span>}
+
+                <div className="auth-pw-requirements">
+                  <p>Password must contain:</p>
+                  {PW_RULES.map((r) => (
+                    <div key={`reset-${r.key}`} className={`auth-pw-req-item${r.test(resetForm.password) ? " met" : ""}`}>
+                      <span className="auth-req-dot" />
+                      {r.label}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="auth-input-group">
+                  <span className="auth-icon-left">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                  <input
+                    type={showResetConfirmPw ? "text" : "password"}
+                    placeholder="Confirm New Password"
+                    className={resetErrors.confirm ? "auth-error-field" : ""}
+                    value={resetForm.confirm}
+                    onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })}
+                  />
+                  <span className="auth-icon-right" onClick={() => setShowResetConfirmPw(!showResetConfirmPw)}>
+                    {showResetConfirmPw ? "Hide" : "Show"}
+                  </span>
+                </div>
+                {resetErrors.confirm && <span className="auth-field-error">{resetErrors.confirm}</span>}
+
+                {resetMsg && <div className={`auth-msg auth-msg-${resetMsg.type}`}>{resetMsg.text}</div>}
+
+                <button className="auth-btn-full" type="submit" style={{ marginTop: 0 }}>Update Password</button>
+              </form>
             </div>
           </div>
         </div>

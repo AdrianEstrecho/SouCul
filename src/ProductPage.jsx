@@ -1,5 +1,16 @@
+/*
+Estrecho, Adrian M.
+Mansilla, Rhangel R.
+Romualdo, Jervin Paul C.
+Sostea, Joana Marie A.
+Torres, Ceazarion Sean Nicholas M.
+Tupaen, Arianne Kaye E.
+
+BSIT/IT22S1
+*/
+
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
 
 // ── Asset Imports ──────────────────────────────────────────────────────────
@@ -410,13 +421,20 @@ function ProdCard({ product, onSelect }) {
 // ── Main Page ─────────────────────────────────────────────────────────────
 export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeFilter, setActiveFilter] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(location.search).get("search") || "");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productError, setProductError] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const queryFromUrl = params.get("search") || "";
+    setSearchQuery((prev) => (prev === queryFromUrl ? prev : queryFromUrl));
+  }, [location.search]);
 
   const filterOptions = useMemo(() => {
     const seen = new Set();
@@ -519,9 +537,34 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
     return true;
   };
 
+  const handleSearchInputChange = (event) => {
+    const nextValue = event.target.value;
+    setSearchQuery(nextValue);
+
+    const params = new URLSearchParams(location.search);
+    const trimmed = nextValue.trim();
+
+    if (trimmed) {
+      params.set("search", trimmed);
+    } else {
+      params.delete("search");
+    }
+
+    const nextSearch = params.toString();
+    const nextUrl = nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname;
+    navigate(nextUrl, { replace: true });
+  };
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+
   const filtered = products.filter(p =>
     (!activeFilter || p.category === activeFilter) &&
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (
+      !normalizedSearch ||
+      [p.name, p.category, p.location, p.description]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch))
+    )
   );
 
   return (
@@ -843,7 +886,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
               type="text"
               placeholder="search"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={handleSearchInputChange}
             />
             <button style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 0 }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">

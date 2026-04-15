@@ -1,3 +1,14 @@
+/*
+Estrecho, Adrian M.
+Mansilla, Rhangel R.
+Romualdo, Jervin Paul C.
+Sostea, Joana Marie A.
+Torres, Ceazarion Sean Nicholas M.
+Tupaen, Arianne Kaye E.
+
+BSIT/IT22S1
+*/
+
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
@@ -279,7 +290,6 @@ function AddPaymentModal({ onSave, onClose }) {
   const [type, setType] = useState("visa");
   const [cardNum, setCardNum] = useState("");
   const [expiry, setExpiry] = useState("");
-  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -337,10 +347,6 @@ function AddPaymentModal({ onSave, onClose }) {
 
         {isCard && (
           <>
-            <div className="form-group">
-              <label className="form-label">Cardholder Name</label>
-              <input className="form-input" placeholder="As printed on card" value={name} onChange={e => setName(e.target.value)} />
-            </div>
             <div className="form-group">
               <label className="form-label">Card Number</label>
               <input className="form-input" placeholder="1234 5678 9012 3456" value={cardNum} onChange={e => setCardNum(formatCard(e.target.value))} />
@@ -477,119 +483,6 @@ function ChangePasswordModal({ onClose, onSubmit }) {
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>
             <button className="btn-save" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Updating..." : "Update Password"}</button>
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
-
-// ── 2FA Modal ─────────────────────────────────────────────────────────────
-function TwoFAModal({ enabled, onClose, onComplete }) {
-  const [step, setStep] = useState(enabled ? "disable" : "choose");
-  const [method, setMethod] = useState("sms");
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [done, setDone] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const inputRefs = useRef([]);
-
-  const handleDigit = (i, v) => {
-    const d = v.replace(/\D/g, "").slice(-1);
-    const next = [...code];
-    next[i] = d;
-    setCode(next);
-    if (d && i < 5) inputRefs.current[i + 1]?.focus();
-  };
-
-  const handleKeyDown = (i, e) => {
-    if (e.key === "Backspace" && !code[i] && i > 0) inputRefs.current[i - 1]?.focus();
-  };
-
-  const verify = async () => {
-    if (code.join("").length !== 6) return;
-
-    setSubmitError("");
-    setIsSubmitting(true);
-    try {
-      await onComplete({
-        two_factor_enabled: !enabled,
-        two_factor_method: method,
-      });
-      setDone(true);
-    } catch (error) {
-      setSubmitError(error?.message || 'Failed to update 2FA settings.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal title="Two-Factor Authentication" onClose={onClose}>
-      {done ? (
-        <div className="success-state">
-          <div className="success-icon">{enabled ? "🔓" : "🔐"}</div>
-          <div className="success-title">{enabled ? "2FA Disabled" : "2FA Enabled!"}</div>
-          <div className="success-sub">{enabled ? "Two-factor authentication has been turned off." : `Your account is now protected via ${method === "sms" ? "SMS" : "authenticator app"}.`}</div>
-          <button className="btn-save" style={{ marginTop: 20, width: "100%" }} onClick={onClose}>Done</button>
-        </div>
-      ) : step === "disable" ? (
-        <>
-          <div className="tfa-info-box">
-            <span style={{ fontSize: 28 }}>⚠️</span>
-            <div>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Disable 2FA?</div>
-              <div style={{ fontSize: 13, color: "#888" }}>This will make your account less secure. Enter your verification code to confirm.</div>
-            </div>
-          </div>
-          <div className="otp-grid" style={{ margin: "20px 0" }}>
-            {code.map((d, i) => (
-              <input key={i} ref={el => inputRefs.current[i] = el} className="otp-input" maxLength={1} value={d}
-                onChange={e => handleDigit(i, e.target.value)} onKeyDown={e => handleKeyDown(i, e)} />
-            ))}
-          </div>
-          {submitError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{submitError}</div>}
-          <div className="modal-actions">
-            <button className="btn-cancel" onClick={onClose}>Keep Enabled</button>
-            <button className="btn-save" style={{ background: "#ef4444" }} onClick={verify} disabled={isSubmitting}>{isSubmitting ? "Updating..." : "Disable 2FA"}</button>
-          </div>
-        </>
-      ) : step === "choose" ? (
-        <>
-          <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>Choose how you'd like to receive your verification code.</p>
-          <div className="tfa-method-list">
-            {[{ v: "sms", icon: "📱", label: "SMS", desc: "Sent to +63 917 *** 4567" }, { v: "app", icon: "🔑", label: "Authenticator App", desc: "Google Authenticator, Authy, etc." }].map(m => (
-              <div key={m.v} className={`tfa-method-card${method === m.v ? " selected" : ""}`} onClick={() => setMethod(m.v)}>
-                <span style={{ fontSize: 24 }}>{m.icon}</span>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{m.label}</div>
-                  <div style={{ fontSize: 12, color: "#aaa" }}>{m.desc}</div>
-                </div>
-                <div className="tfa-radio">{method === m.v && <div className="tfa-radio-dot" />}</div>
-              </div>
-            ))}
-          </div>
-          <div className="modal-actions">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-save" onClick={() => setStep("verify")}>Continue</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>
-            {method === "sms" ? "Enter the 6-digit code sent to your phone." : "Enter the 6-digit code from your authenticator app."}
-          </p>
-          <div className="otp-grid">
-            {code.map((d, i) => (
-              <input key={i} ref={el => inputRefs.current[i] = el} className="otp-input" maxLength={1} value={d}
-                onChange={e => handleDigit(i, e.target.value)} onKeyDown={e => handleKeyDown(i, e)} />
-            ))}
-          </div>
-          <p style={{ fontSize: 12, color: "#aaa", margin: "12px 0 20px", textAlign: "center" }}>Didn't receive it? <span style={{ color: "#2a88b5", cursor: "pointer", fontWeight: 600 }}>Resend</span></p>
-          {submitError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{submitError}</div>}
-          <div className="modal-actions">
-            <button className="btn-cancel" onClick={() => setStep("choose")}>Back</button>
-            <button className="btn-save" onClick={verify} disabled={isSubmitting}>{isSubmitting ? "Updating..." : "Verify & Enable"}</button>
           </div>
         </>
       )}
@@ -1582,40 +1475,6 @@ function NotificationsSection() {
 // ── Security Section (Enhanced) ────────────────────────────────────────────
 function SecuritySection() {
   const [showPassword, setShowPassword] = useState(false);
-  const [showTFA, setShowTFA] = useState(false);
-  const [tfaEnabled, setTfaEnabled] = useState(false);
-  const [tfaMethod, setTfaMethod] = useState("sms");
-  const [linkedAccounts, setLinkedAccounts] = useState([]);
-  const [loginActivity, setLoginActivity] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-
-  const loadSecurityData = async () => {
-    setIsLoading(true);
-    setLoadError("");
-
-    try {
-      const [securityRes, activityRes, linkedRes] = await Promise.all([
-        customerAPI.getSecuritySettings ? customerAPI.getSecuritySettings() : Promise.resolve({ data: {} }),
-        customerAPI.getLoginActivity ? customerAPI.getLoginActivity() : Promise.resolve({ data: [] }),
-        customerAPI.getLinkedAccounts ? customerAPI.getLinkedAccounts() : Promise.resolve({ data: [] }),
-      ]);
-
-      const security = securityRes?.data || {};
-      setTfaEnabled(Boolean(security.two_factor_enabled));
-      setTfaMethod(security.two_factor_method || "sms");
-      setLoginActivity(Array.isArray(activityRes?.data) ? activityRes.data : []);
-      setLinkedAccounts(Array.isArray(linkedRes?.data) ? linkedRes.data : []);
-    } catch (error) {
-      setLoadError(error?.message || "Failed to load security settings.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSecurityData();
-  }, []);
 
   const handlePasswordChange = async ({ current, next, confirm }) => {
     if (!customerAPI || typeof customerAPI.changePassword !== "function") {
@@ -1625,85 +1484,22 @@ function SecuritySection() {
     await customerAPI.changePassword(current, next, confirm);
   };
 
-  const handleTwoFactorUpdate = async ({ two_factor_enabled, two_factor_method }) => {
-    if (!customerAPI || typeof customerAPI.updateSecuritySettings !== "function") {
-      throw new Error("Security settings API is unavailable.");
-    }
-
-    await customerAPI.updateSecuritySettings({ two_factor_enabled, two_factor_method });
-    setTfaEnabled(Boolean(two_factor_enabled));
-    setTfaMethod(two_factor_method || "sms");
-  };
-
-  const items = [
-    {
-      label: "Change Password",
-      desc: "Update your account password",
-      icon: "🔒",
-      action: () => setShowPassword(true),
-    },
-    {
-      label: "Two-Factor Authentication",
-      desc: tfaEnabled ? `Enabled via ${tfaMethod === "app" ? "Authenticator App" : "SMS"}` : "Not enabled",
-      icon: "📲",
-      action: () => setShowTFA(true),
-      badge: tfaEnabled ? "ON" : "OFF",
-      badgeActive: tfaEnabled,
-    },
-    {
-      label: "Login Activity",
-      desc: `${loginActivity.length} recent sign-in${loginActivity.length === 1 ? '' : 's'}`,
-      icon: "🖥️",
-      action: () => {},
-    },
-    {
-      label: "Linked Accounts",
-      desc: linkedAccounts.length > 0
-        ? linkedAccounts.map((a) => a.provider).join(", ")
-        : "No linked accounts",
-      icon: "🔗",
-      action: () => {},
-    },
-  ];
-
   return (
     <div className="section-content">
       <h3 className="section-title">Security</h3>
-      {isLoading && <div style={EMPTY_STATE_STYLE}>Loading security settings...</div>}
-      {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
       <div className="security-list">
-        {items.map(({ label, desc, icon, action, badge, badgeActive }) => (
-          <div key={label} className="security-row" onClick={action}>
-            <span className="security-icon">{icon}</span>
-            <div className="security-info">
-              <div className="security-label">{label}</div>
-              <div className="security-desc">{desc}</div>
-            </div>
-            {badge ? (
-              <span className={`security-badge${badgeActive ? " badge-on" : " badge-off"}`}>{badge}</span>
-            ) : (
-              <Icon d={icons.chevron} size={18} />
-            )}
+        <div className="security-row" onClick={() => setShowPassword(true)}>
+          <span className="security-icon">🔒</span>
+          <div className="security-info">
+            <div className="security-label">Change Password</div>
+            <div className="security-desc">Update your account password</div>
           </div>
-        ))}
+          <Icon d={icons.chevron} size={18} />
+        </div>
       </div>
-
       <div style={{ marginTop: 18 }}>
-        <div className="section-title" style={{ fontSize: 16, marginBottom: 10 }}>Recent Login Activity</div>
-        {loginActivity.length === 0 && <div style={EMPTY_STATE_STYLE}>No recent login activity.</div>}
-        <div className="orders-list">
-          {loginActivity.slice(0, 5).map((entry) => (
-            <div key={entry.id} className="order-card">
-              <div className="order-emoji">🔐</div>
-              <div className="order-info">
-                <div className="order-id">{entry.title || 'Login detected'}</div>
-                <div className="order-meta">{safeDateLabel(entry.created_at)}</div>
-              </div>
-              <div className="order-right">
-                <div className="order-total" style={{ fontSize: 12, color: '#6a7a8a' }}>{entry.message || 'Successful sign in'}</div>
-              </div>
-            </div>
-          ))}
+        <div style={EMPTY_STATE_STYLE}>
+          Additional security options are hidden until full backend workflows are available.
         </div>
       </div>
 
@@ -1711,13 +1507,6 @@ function SecuritySection() {
         <ChangePasswordModal
           onClose={() => setShowPassword(false)}
           onSubmit={handlePasswordChange}
-        />
-      )}
-      {showTFA && (
-        <TwoFAModal
-          enabled={tfaEnabled}
-          onComplete={handleTwoFactorUpdate}
-          onClose={() => setShowTFA(false)}
         />
       )}
     </div>
@@ -1953,10 +1742,6 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           <div className="form-group">
             <label className="form-label">Phone Number</label>
             <input className="form-input" value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} />
-          </div>
-          <div className="form-group full">
-            <label className="form-label">Email Address</label>
-            <input className="form-input" type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} />
           </div>
           <div className="form-group">
             <label className="form-label">Birthday</label>

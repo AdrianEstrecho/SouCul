@@ -1,3 +1,14 @@
+/*
+Estrecho, Adrian M.
+Mansilla, Rhangel R.
+Romualdo, Jervin Paul C.
+Sostea, Joana Marie A.
+Torres, Ceazarion Sean Nicholas M.
+Tupaen, Arianne Kaye E.
+
+BSIT/IT22S1
+*/
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getCookie } from "../utils/cookieState";
@@ -55,6 +66,7 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const inputRef = useRef(null);
+  const isProductsPage = location.pathname === "/ProductPage" || location.pathname === "/Products";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -66,9 +78,50 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
     if (searchOpen) inputRef.current?.focus();
   }, [searchOpen]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const queryFromUrl = params.get("search") || "";
+    setSearchQuery(queryFromUrl);
+  }, [location.search]);
+
+  const applySearch = useCallback((rawQuery, options = {}) => {
+    const { replace = false, forceNavigate = false } = options;
+    const trimmed = String(rawQuery || "").trim();
+
+    if (!trimmed && !isProductsPage && !forceNavigate) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (trimmed) params.set("search", trimmed);
+
+    const nextSearch = params.toString();
+    const nextUrl = nextSearch ? `/ProductPage?${nextSearch}` : "/ProductPage";
+
+    navigate(nextUrl, { replace });
+  }, [isProductsPage, navigate]);
+
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    applySearch(searchQuery, { forceNavigate: true });
+  };
+
+  const handleSearchChange = (event) => {
+    const nextValue = event.target.value;
+    setSearchQuery(nextValue);
+
+    if (isProductsPage) {
+      applySearch(nextValue, { replace: true });
+    }
+  };
+
   const handleSearchClose = () => {
     setSearchOpen(false);
     setSearchQuery("");
+
+    if (isProductsPage) {
+      applySearch("", { replace: true, forceNavigate: true });
+    }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -232,25 +285,32 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
         {/* Search — its own glass pill */}
         <div className={`icon-pill search-pill${searchOpen ? " search-expanded" : ""}`}>
           {searchOpen ? (
-            <div className="search-bar-wrapper">
-              <SearchIcon />
+            <form className="search-bar-wrapper" onSubmit={handleSearchSubmit}>
+              <button type="submit" className="icon-btn" aria-label="Search products">
+                <SearchIcon />
+              </button>
               <input
                 ref={inputRef}
                 type="text"
                 className="search-input"
                 placeholder="Search products..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && handleSearchClose()}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    handleSearchClose();
+                  }
+                }}
               />
-              <button className="icon-btn search-close-btn" onClick={handleSearchClose}>
+              <button type="button" className="icon-btn search-close-btn" onClick={handleSearchClose}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
-            </div>
+            </form>
           ) : (
-            <button className="icon-btn" onClick={() => setSearchOpen(true)}>
+            <button type="button" className="icon-btn" onClick={() => setSearchOpen(true)}>
               <SearchIcon />
             </button>
           )}
