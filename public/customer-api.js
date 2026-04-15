@@ -8,12 +8,19 @@ const isLocalVitePort =
 const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const runtimeConfig = window.__SOUCUL_CONFIG__ || {};
 
+const normalizeBaseUrl = (value) => String(value || '').replace(/\/+$/, '');
+const joinBaseAndEndpoint = (baseUrl, endpoint) => (baseUrl ? `${baseUrl}${endpoint}` : endpoint);
+
 const CUSTOMER_API_BASE_URL = (
   window.SOUCUL_CUSTOMER_API_BASE_URL ||
   runtimeConfig.customerApiBaseUrl ||
-  (isLocalVitePort ? '' : (isLocalHost ? 'http://localhost:8001' : window.location.origin))
-).replace(/\/+$/, '');
-const SAME_ORIGIN_BASE_URL = String(window.location.origin || '').replace(/\/+$/, '');
+  (isLocalVitePort ? '' : (isLocalHost ? 'http://localhost:8001' : ''))
+);
+const SAME_ORIGIN_BASE_URL = normalizeBaseUrl(window.location.origin || '');
+const CUSTOMER_API_SAME_ORIGIN_BACKEND_BASE_URL = SAME_ORIGIN_BASE_URL
+  ? `${SAME_ORIGIN_BASE_URL}/backend/customer/public`
+  : '';
+const LOCAL_CUSTOMER_API_BASE_URL = isLocalVitePort ? 'http://localhost:8001' : '';
 const API_CONFIG_ERROR_MESSAGE =
   'Customer API returned an unexpected response. Check runtime-config.js customerApiBaseUrl and backend routing.';
 
@@ -50,7 +57,7 @@ function dispatchSessionExpired(reason = 'expired') {
 
 class CustomerAPI {
   constructor() {
-    this.baseURL = CUSTOMER_API_BASE_URL;
+    this.baseURL = normalizeBaseUrl(CUSTOMER_API_BASE_URL);
     this.token = getCookie('customer_token') || null;
 
     if (this.token) {
@@ -94,14 +101,6 @@ class CustomerAPI {
   }
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const sameOriginUrl = `${SAME_ORIGIN_BASE_URL}${endpoint}`;
-    const canRetrySameOrigin =
-      !!this.baseURL &&
-      !!SAME_ORIGIN_BASE_URL &&
-      SAME_ORIGIN_BASE_URL !== this.baseURL &&
-      (endpoint.startsWith('/api/') || endpoint.startsWith('/health'));
-
     const headers = {
       ...(options.headers || {})
     };
@@ -124,79 +123,111 @@ class CustomerAPI {
     }
 
     try {
-      let response;
-      let usedFallbackBaseUrl = false;
+      const requestCandidates = [
+        normalizeBaseUrl(this.baseURL),
+        normalizeBaseUrl(SAME_ORIGIN_BASE_URL),
+        normalizeBaseUrl(CUSTOMER_API_SAME_ORIGIN_BACKEND_BASE_URL),
+        normalizeBaseUrl(LOCAL_CUSTOMER_API_BASE_URL),
+        ''
+      ].filter((value, index, arr) => arr.indexOf(value) === index);
 
-      try {
-        response = await fetch(url, {
-          ...options,
-          headers
-        });
-      } catch (primaryError) {
-        const lowered = String(primaryError?.message || '').toLowerCase();
-        const isNetworkFailure =
-          primaryError instanceof TypeError ||
+      const isNetworkFailure = (error) => {
+        const lowered = String(error?.message || '').toLowerCase();
+        return (
+          error instanceof TypeError ||
           lowered.includes('failed to fetch') ||
           lowered.includes('networkerror') ||
-          lowered.includes('name_not_resolved');
+          lowered.includes('name_not_resolved')
+        );
+      };
 
-        if (!canRetrySameOrigin || !isNetworkFailure) {
-          throw primaryError;
+      let lastError = null;
+
+      for (let i = 0; i < requestCandidates.length; i += 1) {
+        const baseCandidate = requestCandidates[i];
+        const hasNextCandidate = i < requestCandidates.length - 1;
+        const requestUrl = joinBaseAndEndpoint(baseCandidate, endpoint);
+
+        let response;
+        try {
+          response = await fetch(requestUrl, {
+            ...options,
+            headers
+          });
+        } catch (fetchError) {
+          if (hasNextCandidate && isNetworkFailure(fetchError)) {
+            lastError = fetchError;
+            continue;
+          }
+          throw fetchError;
         }
 
-        response = await fetch(sameOriginUrl, {
-          ...options,
-          headers
-        });
-        usedFallbackBaseUrl = true;
-      }
+        const rawText = await response.text();
+        let data = null;
 
-      if (usedFallbackBaseUrl) {
-        this.baseURL = SAME_ORIGIN_BASE_URL;
-      }
+        if (rawText) {
+          try {
+            data = JSON.parse(rawText);
+          } catch {
+            const compact = rawText.slice(0, 120).replace(/\s+/g, ' ').trim().toLowerCase();
+            const isHtmlResponse = compact.startsWith('<!doctype') || compact.startsWith('<html');
 
-      // Read the body as text first so we can handle empty bodies (204, etc.)
-      // and non-JSON error pages without throwing "Unexpected end of JSON input".
-      const rawText = await response.text();
-      let data = null;
+            if (isHtmlResponse && hasNextCandidate) {
+              lastError = new Error(`${API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+              continue;
+            }
 
-      if (rawText) {
-        try {
-          data = JSON.parse(rawText);
-        } catch (parseError) {
-          const compact = rawText.slice(0, 120).replace(/\s+/g, ' ').trim().toLowerCase();
-          if (compact.startsWith('<!doctype') || compact.startsWith('<html')) {
-            throw new Error(`${API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+            if (isHtmlResponse) {
+              throw new Error(`${API_CONFIG_ERROR_MESSAGE} Received HTML instead of JSON.`);
+            }
+
+            const snippet = rawText.slice(0, 120).replace(/\s+/g, ' ').trim();
+            throw new Error(
+              `Server returned ${response.status} ${response.statusText || ''} with non-JSON body${snippet ? `: ${snippet}` : ''}`
+            );
+          }
+        }
+
+        if (!response.ok) {
+          if (response.status === 401 && !options.skipAuth) {
+            this.expireSession('unauthorized');
           }
 
-          const snippet = rawText.slice(0, 120).replace(/\s+/g, ' ').trim();
-          throw new Error(
-            `Server returned ${response.status} ${response.statusText || ''} with non-JSON body${snippet ? `: ${snippet}` : ''}`
-          );
+          const apiMessage = (data && data.message) || `Request failed with status ${response.status}`;
+          const isRouteNotFound =
+            response.status === 404 &&
+            typeof apiMessage === 'string' &&
+            /route not found/i.test(apiMessage) &&
+            endpoint.startsWith('/api/v1/customer/');
+
+          if (isRouteNotFound && hasNextCandidate) {
+            lastError = new Error(apiMessage);
+            continue;
+          }
+
+          throw new Error(apiMessage);
         }
+
+        if (normalizeBaseUrl(baseCandidate) !== normalizeBaseUrl(this.baseURL)) {
+          this.baseURL = normalizeBaseUrl(baseCandidate);
+        }
+
+        if (this.token && !options.skipAuth) {
+          const refreshedToken = response.headers.get('X-Auth-Token');
+          if (refreshedToken) {
+            this.token = refreshedToken;
+          }
+          this.touchSessionActivity();
+        }
+
+        return data ?? { success: true, data: null };
       }
 
-      if (!response.ok) {
-        if (response.status === 401 && !options.skipAuth) {
-          this.expireSession('unauthorized');
-        }
-
-        throw new Error(
-          (data && data.message) || `Request failed with status ${response.status}`
-        );
+      if (lastError) {
+        throw lastError;
       }
 
-      if (this.token && !options.skipAuth) {
-        const refreshedToken = response.headers.get('X-Auth-Token');
-        if (refreshedToken) {
-          this.token = refreshedToken;
-        }
-        this.touchSessionActivity();
-      }
-
-      // Empty 2xx response (e.g. 204 No Content) — return a minimal success envelope
-      // so callers that read result.success / result.data don't crash.
-      return data ?? { success: true, data: null };
+      throw new Error(API_CONFIG_ERROR_MESSAGE);
     } catch (error) {
       console.error('API Error:', error);
       throw error;
@@ -316,6 +347,13 @@ class CustomerAPI {
 
   async getOrder(orderId) {
     return await this.request(`/api/v1/customer/orders/${orderId}`);
+  }
+
+  async updateOrderStatus(orderId, status) {
+    return await this.request(`/api/v1/customer/orders/${orderId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
   }
 
   async checkout(data) {

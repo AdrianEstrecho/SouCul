@@ -37,15 +37,31 @@ foreach ($cartItems as $item) {
 // Generate order number
 $orderNumber = 'ORD-' . strtoupper(uniqid());
 
+$paymentMethod = strtolower(trim((string) ($body['payment_method'] ?? '')));
+$isCashOnDelivery = in_array($paymentMethod, ['cod', 'cash_on_delivery', 'cash on delivery'], true);
+$initialStatus = $isCashOnDelivery ? 'cash_on_delivery_requested' : 'online_payment_requested';
+
+$normalizedPaymentMethod = match ($paymentMethod) {
+    'cod', 'cash_on_delivery', 'cash on delivery' => 'cod',
+    'gcash' => 'gcash',
+    'bank', 'bank_transfer', 'bank transfer' => 'bank_transfer',
+    'paypal' => 'paypal',
+    'debit_card', 'debit card' => 'debit_card',
+    default => 'credit_card',
+};
+
+$initialPaymentStatus = 'pending';
+
 // Create order
 $stmt = $db->prepare("
     INSERT INTO orders (order_number, user_id, status, subtotal, total_amount,
                        shipping_address, shipping_city, shipping_province, shipping_phone)
-    VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ");
 $stmt->execute([
     $orderNumber,
     $userId,
+    $initialStatus,
     $subtotal,
     $subtotal,
     $body['shipping_address'],
@@ -55,6 +71,19 @@ $stmt->execute([
 ]);
 
 $orderId = $db->lastInsertId();
+
+// Create initial payment record so payment status is visible immediately.
+try {
+    $paymentStmt = $db->prepare("\n        INSERT INTO payments (order_id, payment_method, payment_status, amount)\n        VALUES (?, ?, ?, ?)\n    ");
+    $paymentStmt->execute([
+        $orderId,
+        $normalizedPaymentMethod,
+        $initialPaymentStatus,
+        $subtotal,
+    ]);
+} catch (Throwable $e) {
+    error_log('Unable to create payment record for order ' . $orderId . ': ' . $e->getMessage());
+}
 
 // Create order items
 $stmt = $db->prepare("
@@ -117,6 +146,10 @@ try {
 }
 
 success([
+    'order_id' => (int) $orderId,
     'order_number' => $orderNumber,
-    'total_amount' => $subtotal
+    'total_amount' => $subtotal,
+    'order_status' => $initialStatus,
+    'payment_method' => $normalizedPaymentMethod,
+    'payment_status' => $initialPaymentStatus,
 ], 'Order placed successfully');

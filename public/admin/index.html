@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SouCul Admin Panel</title>
+<title>Admin Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
 <link rel="stylesheet" href="admin.css" />
+<link rel="shortcut icon" href="/assets/images/icon.png" type="image/x-icon" />
 
 </head>
 <body>
@@ -192,11 +193,16 @@
         </div>
         <div class="filter-bar">
           <button class="filter-btn active" onclick="filterOrders('all',this)">All</button>
-          <button class="filter-btn" onclick="filterOrders('Pending',this)">Pending</button>
-          <button class="filter-btn" onclick="filterOrders('Processing',this)">Processing</button>
-          <button class="filter-btn" onclick="filterOrders('Shipped',this)">Shipped</button>
-          <button class="filter-btn" onclick="filterOrders('Completed',this)">Completed</button>
-          <button class="filter-btn" onclick="filterOrders('Cancelled',this)">Cancelled</button>
+          <button class="filter-btn" onclick="filterOrders('pending_payment',this)">Pending Payment</button>
+          <button class="filter-btn" onclick="filterOrders('payment_confirmed',this)">Payment Confirmed</button>
+          <button class="filter-btn" onclick="filterOrders('cod_requested',this)">COD Requested</button>
+          <button class="filter-btn" onclick="filterOrders('cod_confirmed',this)">COD Confirmed</button>
+          <button class="filter-btn" onclick="filterOrders('processing',this)">Processing</button>
+          <button class="filter-btn" onclick="filterOrders('waiting_for_courier',this)">Waiting for Courier</button>
+          <button class="filter-btn" onclick="filterOrders('shipped',this)">Shipped</button>
+          <button class="filter-btn" onclick="filterOrders('out_for_delivery',this)">Out for Delivery</button>
+          <button class="filter-btn" onclick="filterOrders('delivered',this)">Delivered</button>
+          <button class="filter-btn" onclick="filterOrders('cancelled',this)">Cancelled</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -370,7 +376,7 @@
     <input type="hidden" id="edit-product-id" />
     <div class="form-row">
       <div class="form-group"><label>Product Name *</label><input id="p-name" /></div>
-      <div class="form-group"><label>Brand / Maker</label><input id="p-brand" /></div>
+      <div class="form-group"><label>Material / Maker</label><input id="p-brand" /></div>
     </div>
     <div class="form-group"><label>Description *</label><textarea id="p-desc"></textarea></div>
     <div class="form-row">
@@ -529,6 +535,11 @@
         <h3><i class="fa-solid fa-box-open"></i> Order Info</h3>
         <div class="info-row"><span class="key">Order ID</span><span id="od-id">—</span></div>
         <div class="info-row"><span class="key">Status</span><span id="od-status">—</span></div>
+        <div class="info-row"><span class="key">Workflow Step</span><span id="od-workflow-step">—</span></div>
+        <div class="info-row"><span class="key">Next Step</span><span id="od-next-step">—</span></div>
+        <div class="info-row"><span class="key">Status Note</span><span id="od-status-note">—</span></div>
+        <div class="info-row"><span class="key">Payment Method</span><span id="od-payment-method">—</span></div>
+        <div class="info-row"><span class="key">Payment Status</span><span id="od-payment-status">—</span></div>
         <div class="info-row"><span class="key">Total</span><span id="od-total">—</span></div>
         <div class="info-row"><span class="key">Date</span><span id="od-date">—</span></div>
       </div>
@@ -542,6 +553,7 @@
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody id="od-items"></tbody></table></div>
     </div>
     <div class="modal-footer">
+      <button class="btn btn-teal" id="od-advance-btn" onclick="updateOrderStatus()">Move to Next Step</button>
       <button class="btn btn-outline" onclick="closeModal('modal-order')">Close</button>
     </div>
   </div>

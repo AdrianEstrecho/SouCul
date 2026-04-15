@@ -1,18 +1,17 @@
 // SouCul runtime configuration for production hosting.
 //
 // Edit these values on the server without rebuilding frontend assets.
-// Example for Hostinger subdomains:
-window.__SOUCUL_CONFIG__.adminApiBaseUrl = "https://api-admin.soucul.store";
-window.__SOUCUL_CONFIG__.customerApiBaseUrl = "https://api-customer.soucul.store";
-//
-// Example for single-domain fallback (no subdomains):
-window.__SOUCUL_CONFIG__.adminApiBaseUrl = "";
-window.__SOUCUL_CONFIG__.customerApiBaseUrl = "";
+window.__SOUCUL_CONFIG__ = window.__SOUCUL_CONFIG__ || {};
+
+// Optional explicit overrides:
+// window.__SOUCUL_CONFIG__.adminApiBaseUrl = "https://api-admin.soucul.store";
+// window.__SOUCUL_CONFIG__.customerApiBaseUrl = "https://api-customer.soucul.store";
+// window.__SOUCUL_CONFIG__.adminApiBaseUrl = "";
+// window.__SOUCUL_CONFIG__.customerApiBaseUrl = "";
 
 (function initSouculRuntimeConfig() {
 	const config = window.__SOUCUL_CONFIG__ || {};
 	const hostname = String(window.location.hostname || "");
-	const protocol = String(window.location.protocol || "https:");
 	const isLocalHost = /^(localhost|127\.0\.0\.1)$/i.test(hostname);
 	const isIpHost = /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
 	const isHostingerPreviewDomain = /\.hostingersite\.com$/i.test(hostname);
@@ -34,8 +33,8 @@ window.__SOUCUL_CONFIG__.customerApiBaseUrl = "";
 		}
 	};
 
-	const inferSubdomainBaseUrl = (serviceName) => {
-		if (!hostname || isLocalHost || isIpHost) {
+	const inferApiBaseUrl = (serviceName) => {
+		if (!hostname || isLocalHost || isIpHost || isHostingerPreviewDomain) {
 			return "";
 		}
 
@@ -44,11 +43,13 @@ window.__SOUCUL_CONFIG__.customerApiBaseUrl = "";
 			return normalizeUrl(window.location.origin);
 		}
 
-		return normalizeUrl(`${protocol}//${expectedPrefix}${hostname}`);
+		// Do not auto-guess api-{service}.{hostname}; many deployments do not provision
+		// dedicated API subdomains and should fall back to same-origin routing.
+		return "";
 	};
 
-	const inferredAdmin = isHostingerPreviewDomain ? "" : inferSubdomainBaseUrl("admin");
-	const inferredCustomer = isHostingerPreviewDomain ? "" : inferSubdomainBaseUrl("customer");
+	const inferredAdmin = inferApiBaseUrl("admin");
+	const inferredCustomer = inferApiBaseUrl("customer");
 
 	const resolveConfiguredBaseUrl = (key, inferredValue) => {
 		const hasExplicitValue = Object.prototype.hasOwnProperty.call(config, key);

@@ -2,6 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
 import Footer from "./Components/Footer";
+import fallbackImage from "./assets/no-image.jpg";
+
+const resolveItemImage = (rawUrl) => {
+  const value = String(rawUrl || "").trim();
+  return value || fallbackImage;
+};
 
 const PhilippinesMapBg = () => (
   <svg
@@ -72,13 +78,15 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
 
                 {/* Image */}
                 <div style={{ width: 80, height: 80, borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: "#f3f4f6", color: "#64748b", fontSize: 24 }}>
-                      📦
-                    </div>
-                  )}
+                  <img
+                    src={resolveItemImage(item.image)}
+                    alt={item.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = fallbackImage;
+                    }}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
                 </div>
 
                 {/* Info */}
