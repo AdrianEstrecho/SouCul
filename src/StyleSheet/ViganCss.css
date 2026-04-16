@@ -3367,7 +3367,50 @@ BSIT/IT22S1
   margin: 18px 0;
 }
 
-/* ── Responsive ── */
+/* ── Privacy Modal ── */
+.auth-privacy-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.auth-btn-privacy-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 125, 175, 0.82);
+  margin-top: 0;
+}
+
+.auth-btn-privacy-confirm:hover {
+  background: rgba(30, 125, 175, 1);
+}
+
+.auth-btn-privacy-decline {
+  width: 100%;
+  padding: 10px 0;
+  margin-top: 10px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.65);
+  transition: all 0.2s;
+}
+
+.auth-btn-privacy-decline:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+
 @media (max-width: 520px) {
   .auth-card-wrapper,
   .auth-modal-wrapper {
