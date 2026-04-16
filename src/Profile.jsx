@@ -14,6 +14,8 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "./Components/Navbar";
 import profileOrderFallbackImage from "./assets/no-image.jpg";
 
+import { getLocalWishlist, removeFromLocalWishlist } from "./utils/localWishlist";
+
 // Get API instance
 const customerAPI = window.customerAPI || {};
 
@@ -887,6 +889,7 @@ function WishlistSection() {
   const [list, setList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
@@ -897,15 +900,17 @@ function WishlistSection() {
 
       try {
         if (!customerAPI || typeof customerAPI.getWishlist !== "function") {
-          throw new Error("Wishlist API is unavailable.");
+          throw new Error("API unavailable");
         }
 
         const result = await customerAPI.getWishlist();
         if (!mounted) return;
-        setList(Array.isArray(result?.data) ? result.data : []);
-      } catch (error) {
+        const apiList = Array.isArray(result?.data) ? result.data : [];
+        setList(apiList.length > 0 ? apiList : getLocalWishlist());
+      } catch {
+        // Fall back to localStorage
         if (!mounted) return;
-        setLoadError(error?.message || "Failed to load wishlist.");
+        setList(getLocalWishlist());
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -918,15 +923,14 @@ function WishlistSection() {
   const removeItem = async (productId) => {
     const previous = list;
     setList((curr) => curr.filter((x) => Number(x.product_id) !== Number(productId)));
+    removeFromLocalWishlist(productId);
 
     try {
-      if (!customerAPI || typeof customerAPI.removeFromWishlist !== "function") {
-        throw new Error("Wishlist API is unavailable.");
+      if (customerAPI && typeof customerAPI.removeFromWishlist === "function") {
+        await customerAPI.removeFromWishlist(productId);
       }
-      await customerAPI.removeFromWishlist(productId);
-    } catch (error) {
-      setList(previous);
-      setLoadError(error?.message || "Failed to update wishlist.");
+    } catch {
+      // localStorage already updated
     }
   };
 
@@ -936,18 +940,36 @@ function WishlistSection() {
       {isLoading && <div style={EMPTY_STATE_STYLE}>Loading wishlist...</div>}
       {loadError && <div className="auth-msg auth-msg-error" style={{ marginBottom: 12 }}>{loadError}</div>}
       {!isLoading && !loadError && list.length === 0 && <div style={EMPTY_STATE_STYLE}>Your wishlist is empty.</div>}
-      <div className="wishlist-grid">
-        {list.map((item) => (
-          <div key={item.wishlist_id || item.product_id} className="wish-card">
-            <div className="wish-emoji">❤️</div>
-            <div className="wish-name">{item.name}</div>
-            <div className="wish-location">📍 {item.location || "SouCul"}</div>
-            <div className="wish-footer">
-              <span className="wish-price">{formatPeso(item.price)}</span>
-              <button className="wish-remove" onClick={() => removeItem(item.product_id)}>✕</button>
+      <div className="wishlist-list">
+        {list.map((item) => {
+          const imgSrc = item.image || item.featured_image_url || item.product_image_url || "";
+          return (
+            <div key={item.wishlist_id || item.product_id} className="wish-row">
+              {imgSrc ? (
+                <div className="wish-row-img"><img src={imgSrc} alt={item.name} /></div>
+              ) : (
+                <div className="wish-row-img wish-row-img-placeholder">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c0d0da" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
+                </div>
+              )}
+              <div className="wish-row-info">
+                <div className="wish-row-name">{item.name}</div>
+                <div className="wish-row-loc">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                  {item.location || "SouCul"}
+                </div>
+              </div>
+              <div className="wish-row-price">{formatPeso(item.price)}</div>
+              <button className="wish-row-view" onClick={() => navigate(`/Product/${item.product_id}`)}>
+                View
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+              <button className="wish-row-remove" onClick={() => removeItem(item.product_id)} title="Remove">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -2162,15 +2184,100 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .order-total-row.grand strong { color: #2a88b5; }
 
         /* ── Wishlist ── */
-        .wishlist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .wish-card { padding: 16px; border: 1.5px solid #dbeaf2; border-radius: 12px; }
-        .wish-emoji { font-size: 32px; margin-bottom: 8px; }
-        .wish-name { font-weight: 600; font-size: 14px; }
-        .wish-location { font-size: 12px; color: #aaa; margin: 4px 0 10px; }
-        .wish-footer { display: flex; align-items: center; justify-content: space-between; }
-        .wish-price { font-weight: 700; color: #2a88b5; }
-        .wish-remove { background: none; border: none; cursor: pointer; color: #ccc; font-size: 14px; }
-        .wish-remove:hover { color: #e53e3e; }
+        .wishlist-list { display: flex; flex-direction: column; gap: 10px; }
+        .wish-row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 12px;
+          border: 1.5px solid #e8eef3;
+          border-radius: 12px;
+          background: #fff;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .wish-row:hover {
+          border-color: #b8d4e3;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .wish-row-img {
+          width: 56px;
+          height: 56px;
+          border-radius: 10px;
+          overflow: hidden;
+          flex-shrink: 0;
+          background: #edf4f8;
+        }
+        .wish-row-img img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .wish-row-img-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .wish-row-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .wish-row-name {
+          font-weight: 700;
+          font-size: 14px;
+          color: #1a1a2e;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-bottom: 3px;
+        }
+        .wish-row-loc {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          color: #9ca3af;
+        }
+        .wish-row-loc svg { color: #f87171; flex-shrink: 0; }
+        .wish-row-price {
+          font-weight: 800;
+          font-size: 15px;
+          color: #0091A9;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .wish-row-view {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 8px 14px;
+          border-radius: 8px;
+          border: 1.5px solid #0091A9;
+          background: transparent;
+          color: #0091A9;
+          font-size: 12px;
+          font-weight: 700;
+          font-family: inherit;
+          cursor: pointer;
+          flex-shrink: 0;
+          white-space: nowrap;
+          transition: background 0.2s, color 0.2s;
+        }
+        .wish-row-view:hover { background: #0091A9; color: #fff; }
+        .wish-row-remove {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: none;
+          border: 1.5px solid #e5e7eb;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #bbb;
+          flex-shrink: 0;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .wish-row-remove:hover { background: #fee2e2; color: #e53e3e; border-color: #fca5a5; }
 
         /* ── Addresses ── */
         .address-list { display: flex; flex-direction: column; gap: 12px; }
@@ -2228,7 +2335,7 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           .profile-layout { grid-template-columns: 1fr; }
           .avatar-stats { display: none; }
           .form-grid { grid-template-columns: 1fr; }
-          .wishlist-grid { grid-template-columns: 1fr; }
+          .wish-row-view { padding: 6px 10px; font-size: 11px; }
           .pd-details-grid { grid-template-columns: 1fr; }
           .profile-banner { padding-top: 100px; }
           .pd-account-strip { flex-wrap: wrap; gap: 16px; }

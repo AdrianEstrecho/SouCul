@@ -53,6 +53,7 @@ import Checkout from "./Checkout";
 import PaymentProcessing from "./PaymentProcessing";
 import Profile from "./Profile";
 import Login from "./Login";
+import ProductDetail from "./ProductDetail";
 import { getCookie, getJsonCookie, removeCookie, setCookie } from "./utils/cookieState";
 
 const GUEST_PROFILE = { name: "Guest", email: "", phone: "", birthday: "", gender: "", profileImage: "", createdAt: "" };
@@ -388,15 +389,34 @@ export default function Soucul() {
       return false;
     }
 
+    rememberProductImage(product.id, product.image || product.imageUrl);
+
     try {
-      rememberProductImage(product.id, product.image || product.imageUrl);
       const api = getCustomerApi();
       await api.addToCart(product.id, product.qty || 1);
       await hydrateCartFromAPI();
       return true;
     } catch (error) {
-      console.error('Failed to add to cart:', error);
-      return false;
+      console.error('API cart failed, adding locally:', error);
+      // Fallback: add to local cart state when backend is unavailable
+      const qtyToAdd = product.qty || 1;
+      setCartItems((prev) => {
+        const existing = prev.find((i) => i.id === product.id);
+        if (existing) {
+          return prev.map((i) => i.id === product.id ? { ...i, qty: i.qty + qtyToAdd } : i);
+        }
+        return [...prev, {
+          cartId: Date.now(),
+          id: product.id,
+          name: product.name || "Product",
+          location: product.location || "SouCul",
+          image: product.image || product.imageUrl || "",
+          price: product.price || 0,
+          qty: qtyToAdd,
+          checked: false,
+        }];
+      });
+      return true;
     }
   };
 
@@ -504,6 +524,7 @@ export default function Soucul() {
             onLogout={handleLogout}
           />
         } />
+        <Route path="/Product/:id" element={<ProductDetail {...cartProps} />} />
         <Route path="/AboutUs"     element={<AboutUs {...cartProps} />} />
 
         {/* Vigan */}

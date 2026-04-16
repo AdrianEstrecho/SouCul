@@ -442,7 +442,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
   const location = useLocation();
   const [activeFilter, setActiveFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(location.search).get("search") || "");
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null); // kept for state compat
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -467,7 +467,11 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
 
     const prioritized = CATEGORY_ORDER.filter((name) => seen.has(name));
     const dynamic = unique.filter((name) => !CATEGORY_ORDER.includes(name)).sort((a, b) => a.localeCompare(b));
-    return [...prioritized, ...dynamic];
+    const result = [...prioritized, ...dynamic];
+
+    // Always show category buttons even when no products are loaded
+    if (result.length === 0) return [...CATEGORY_ORDER];
+    return result;
   }, [products]);
 
   const featuredCarouselProducts = useMemo(() => {
@@ -542,6 +546,10 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
       setActiveFilter(filterOptions[0]);
     }
   }, [filterOptions, activeFilter]);
+
+  const goToProduct = (product) => {
+    navigate(`/Product/${product.id}`);
+  };
 
   const addToCart = (product) => {
     if (typeof onAddToCart !== "function") return false;
@@ -869,7 +877,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
 
         <div className="pp-carousel-outer">
           {featuredCarouselProducts.length > 0 ? (
-            <FeaturedCarousel products={featuredCarouselProducts} onSelect={setSelectedProduct} />
+            <FeaturedCarousel products={featuredCarouselProducts} onSelect={goToProduct} />
           ) : (
             <div className="empty-state">{loadingProducts ? "Loading featured products from database..." : "No featured products available yet."}</div>
           )}
@@ -941,7 +949,7 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
                       <h3 className="province-title">{province}</h3>
                     </div>
                     <div className="products-grid">
-                      {items.map((p) => <ProdCard key={p.id} product={p} onSelect={setSelectedProduct} />)}
+                      {items.map((p) => <ProdCard key={p.id} product={p} onSelect={goToProduct} />)}
                     </div>
                   </div>
                 ));
@@ -1002,15 +1010,6 @@ export default function ProductPage({ cartCount, onAddToCart, onDirectCheckout }
         </div>
       </footer>
 
-      {selectedProduct && (
-        <PPProductModal
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
-          onAddToCart={addToCart}
-          onCheckoutProduct={handleCheckout}
-        />
-      )}
-
-</>
+    </>
   );
 }

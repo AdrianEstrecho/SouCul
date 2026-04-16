@@ -284,7 +284,7 @@ const handlePlaceOrder = async (e) => {
 
     return (
       <div className="soucul-app checkout-page">
-        <Navbar cartCount={0} />
+        <Navbar cartCount={0} solidBackground />
         <div className="checkout-success">
           <div className="checkout-success-icon">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5">
@@ -317,7 +317,7 @@ const handlePlaceOrder = async (e) => {
   if (items.length === 0) {
     return (
       <div className="soucul-app checkout-page">
-        <Navbar cartCount={cartCount} />
+        <Navbar cartCount={cartCount} solidBackground />
         <div className="checkout-empty">
           <h2>No items to checkout</h2>
           <p>Add some products to your cart first.</p>
@@ -331,7 +331,7 @@ const handlePlaceOrder = async (e) => {
 
   return (
     <div className="soucul-app checkout-page">
-      <Navbar cartCount={cartCount} />
+      <Navbar cartCount={cartCount} solidBackground />
 
       <div className="checkout-container">
         <h1 className="checkout-title">Checkout</h1>

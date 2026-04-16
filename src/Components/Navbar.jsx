@@ -12,6 +12,7 @@ BSIT/IT22S1
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getCookie } from "../utils/cookieState";
+import SearchModal from "./SearchModal";
 
 const SearchIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="White" strokeWidth="2">
@@ -39,7 +40,7 @@ const BellIcon = ({ size = 22 }) => (
   </svg>
 );
 
-export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
+export default function Navbar({ cartCount, onGoHome, hideBackButton, solidBackground }) {
   const [showGuestMsg, setShowGuestMsg] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -64,9 +65,6 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   }, [getActiveNav]);
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef(null);
-  const isProductsPage = location.pathname === "/ProductPage" || location.pathname === "/Products";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -74,55 +72,17 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Ctrl+K / Cmd+K keyboard shortcut to open search
   useEffect(() => {
-    if (searchOpen) inputRef.current?.focus();
-  }, [searchOpen]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const queryFromUrl = params.get("search") || "";
-    setSearchQuery(queryFromUrl);
-  }, [location.search]);
-
-  const applySearch = useCallback((rawQuery, options = {}) => {
-    const { replace = false, forceNavigate = false } = options;
-    const trimmed = String(rawQuery || "").trim();
-
-    if (!trimmed && !isProductsPage && !forceNavigate) {
-      return;
-    }
-
-    const params = new URLSearchParams();
-    if (trimmed) params.set("search", trimmed);
-
-    const nextSearch = params.toString();
-    const nextUrl = nextSearch ? `/ProductPage?${nextSearch}` : "/ProductPage";
-
-    navigate(nextUrl, { replace });
-  }, [isProductsPage, navigate]);
-
-  const handleSearchSubmit = (event) => {
-    event.preventDefault();
-    applySearch(searchQuery, { forceNavigate: true });
-  };
-
-  const handleSearchChange = (event) => {
-    const nextValue = event.target.value;
-    setSearchQuery(nextValue);
-
-    if (isProductsPage) {
-      applySearch(nextValue, { replace: true });
-    }
-  };
-
-  const handleSearchClose = () => {
-    setSearchOpen(false);
-    setSearchQuery("");
-
-    if (isProductsPage) {
-      applySearch("", { replace: true, forceNavigate: true });
-    }
-  };
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -249,11 +209,14 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
   }, [notifOpen]);
 
   return (
-    <nav className={`navbar${scrolled ? " scrolled" : ""}`} onClick={(e) => e.stopPropagation()}>
+    <nav className={`navbar${scrolled || solidBackground ? " scrolled" : ""}`} onClick={(e) => e.stopPropagation()}>
 
       <div className="navbar-left">
         {!hideBackButton && (
-          <button className="btn-back" onClick={() => onGoHome ? onGoHome() : navigate("/")}>
+          <button className="btn-back" onClick={() => {
+            if (onGoHome) { onGoHome(); return; }
+            if (window.history.length > 1) { navigate(-1); } else { navigate("/"); }
+          }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="m15 18-6-6 6-6" />
             </svg>
@@ -282,38 +245,12 @@ export default function Navbar({ cartCount, onGoHome, hideBackButton }) {
 
       <div className="navbar-right">
 
-        {/* Search — its own glass pill */}
-        <div className={`icon-pill search-pill${searchOpen ? " search-expanded" : ""}`}>
-          {searchOpen ? (
-            <form className="search-bar-wrapper" onSubmit={handleSearchSubmit}>
-              <button type="submit" className="icon-btn" aria-label="Search products">
-                <SearchIcon />
-              </button>
-              <input
-                ref={inputRef}
-                type="text"
-                className="search-input"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    handleSearchClose();
-                  }
-                }}
-              />
-              <button type="button" className="icon-btn search-close-btn" onClick={handleSearchClose}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </form>
-          ) : (
-            <button type="button" className="icon-btn" onClick={() => setSearchOpen(true)}>
-              <SearchIcon />
-            </button>
-          )}
+        {/* Search */}
+        <div className="icon-pill srch-pill">
+          <button type="button" className="icon-btn" onClick={() => setSearchOpen((p) => !p)} aria-label="Search products">
+            <SearchIcon />
+          </button>
+          <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
         </div>
 
         {/* Notification Bell */}
