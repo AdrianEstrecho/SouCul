@@ -29,6 +29,12 @@ const resolveItemImage = (rawUrl) => {
 
 const normalizeDigits = (value) => String(value || "").replace(/\D/g, "");
 
+const normalizeWholeNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.floor(parsed));
+};
+
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
 const isValidPHMobile = (value) => {
@@ -212,13 +218,25 @@ const handlePlaceOrder = async (e) => {
         throw new Error("Checkout API is unavailable. Please refresh and try again.");
       }
 
-      const result = await api.checkout({
+      const checkoutPayload = {
         shipping_address: form.address,
         shipping_city: form.city,
         shipping_province: form.province,
         shipping_phone: form.phone,
         payment_method: form.paymentMethod,
-      });
+      };
+
+      if (isDirectCheckout && directCheckoutItem) {
+        checkoutPayload.direct_item = {
+          product_id: normalizeWholeNumber(
+            directCheckoutItem.product_id ?? directCheckoutItem.id,
+            0
+          ),
+          quantity: Math.max(1, normalizeWholeNumber(directCheckoutItem.qty, 1)),
+        };
+      }
+
+      const result = await api.checkout(checkoutPayload);
 
       if (result.success) {
         const orderData = result?.data || null;
