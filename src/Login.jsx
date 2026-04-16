@@ -28,6 +28,8 @@ export default function Login({ onLogin, onGuestLogin }) {
   const [showForgot, setShowForgot] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showTos, setShowTos] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
 
   // Login state
   const [loginForm, setLoginForm] = useState({
@@ -96,6 +98,9 @@ export default function Login({ onLogin, onGuestLogin }) {
     setLoginForm({ username: "", password: "" });
     setLoginErrors({});
     setLoginMsg(null);
+    // Show the privacy notice when entering the signup flow
+    setPrivacyAcknowledged(false);
+    setShowPrivacy(true);
   };
 
   const switchToLogin = () => {
@@ -104,6 +109,7 @@ export default function Login({ onLogin, onGuestLogin }) {
     setSignupErrors({});
     setSignupMsg(null);
     setTermsChecked(false);
+    setPrivacyAcknowledged(false);
   };
 
   // ── Demo account (works without backend) ──
@@ -620,6 +626,80 @@ export default function Login({ onLogin, onGuestLogin }) {
               <div className="auth-tos-divider" />
               <button className="auth-btn-full" onClick={() => { setTermsChecked(true); setShowTos(false); setSignupErrors((e) => ({ ...e, terms: undefined })); }}>
                 I Agree & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Data Privacy Modal (shown on signup entry) ── */}
+      {showPrivacy && (
+        <div className="auth-modal-overlay">
+          <div className="auth-tos-wrapper auth-fade-in">
+            <div className="auth-modal-card auth-tos-card">
+              <div className="auth-privacy-header">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <div className="auth-tos-title" style={{ marginBottom: 0 }}>Data Privacy Notice</div>
+              </div>
+              <p className="auth-tos-text" style={{ marginTop: 12 }}>
+                Before creating your account, please read how <strong>SouCul Shop</strong> collects, uses, and protects your personal information in accordance with the <strong>Philippine Data Privacy Act of 2012 (Republic Act No. 10173)</strong>.
+              </p>
+
+              {[
+                {
+                  title: "1. Personal Information We Collect",
+                  text: "We collect your full name, email address, and account credentials during registration. Additional information such as your shipping address, contact number, and order history may be collected as you use our services.",
+                },
+                {
+                  title: "2. Purpose of Data Collection",
+                  text: "Your personal data is used solely to manage your account, process orders and payments, deliver products, send relevant service notifications, and improve your shopping experience on SouCul Shop.",
+                },
+                {
+                  title: "3. Data Sharing & Disclosure",
+                  text: "We do not sell or rent your personal information to third parties. We may share data with trusted logistics and payment partners strictly for order fulfillment, and only to the extent necessary.",
+                },
+                {
+                  title: "4. Data Retention",
+                  text: "We retain your personal data for as long as your account is active or as required by law. You may request deletion of your account and associated data at any time by contacting our support team.",
+                },
+                {
+                  title: "5. Your Rights Under RA 10173",
+                  text: "You have the right to be informed, to access, to correct, to erase, to object, and to data portability. To exercise any of these rights, please reach out to our Data Protection Officer.",
+                },
+                {
+                  title: "6. Security Measures",
+                  text: "We implement industry-standard security measures including encrypted connections (HTTPS) and hashed password storage to protect your personal information from unauthorized access.",
+                },
+                {
+                  title: "7. Consent",
+                  text: "By clicking 'I Understand & Continue', you acknowledge that you have read this notice and consent to the collection and use of your personal information as described above.",
+                },
+              ].map((s) => (
+                <div key={s.title}>
+                  <div className="auth-tos-section-title">{s.title}</div>
+                  <p className="auth-tos-text">{s.text}</p>
+                </div>
+              ))}
+
+              <div className="auth-tos-divider" />
+              <button
+                className="auth-btn-full auth-btn-privacy-confirm"
+                onClick={() => {
+                  setPrivacyAcknowledged(true);
+                  setShowPrivacy(false);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}>
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                I Understand &amp; Continue
+              </button>
+              <button
+                className="auth-btn-privacy-decline"
+                onClick={() => { setShowPrivacy(false); setView("login"); }}
+              >
+                Decline &amp; Go Back
               </button>
             </div>
           </div>
