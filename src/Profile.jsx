@@ -243,7 +243,7 @@ function Modal({ title, onClose, children }) {
       <div className="modal-box">
         <div className="modal-header">
           <div className="modal-title">{title}</div>
-          <button className="modal-close" onClick={onClose}><Icon d={icons.x} size={16} /></button>
+          <button type="button" className="modal-close" onClick={onClose}><Icon d={icons.x} size={16} /></button>
         </div>
         <div className="modal-body">{children}</div>
       </div>
@@ -872,11 +872,12 @@ function OrdersSection() {
             </div>
 
             <div className="order-actions-row">
-              <button className="order-detail-toggle" onClick={() => toggleOrderDetails(o.id)}>
+              <button type="button" className="order-detail-toggle" onClick={() => toggleOrderDetails(o.id)}>
                 {isExpanded ? "Hide Details" : "View Details"}
               </button>
               {canCancel && (
                 <button
+                  type="button"
                   className="order-cancel-btn"
                   onClick={() => openCancelOrderModal(o.id, rawStatus)}
                   disabled={isCanceling}
@@ -1051,8 +1052,8 @@ function OrdersSection() {
           {cancelModalError && <div className="auth-msg auth-msg-error" style={{ marginTop: 8 }}>{cancelModalError}</div>}
 
           <div className="modal-actions" style={{ marginTop: 14 }}>
-            <button className="btn-cancel" onClick={closeCancelOrderModal} disabled={cancelingOrderId !== null}>Keep Order</button>
-            <button className="btn-save" onClick={submitCancelOrder} disabled={cancelingOrderId !== null}>
+            <button type="button" className="btn-cancel" onClick={closeCancelOrderModal} disabled={cancelingOrderId !== null}>Keep Order</button>
+            <button type="button" className="btn-save" onClick={submitCancelOrder} disabled={cancelingOrderId !== null}>
               {cancelingOrderId !== null ? "Cancelling..." : "Confirm Cancellation"}
             </button>
           </div>
