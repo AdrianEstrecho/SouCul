@@ -28,7 +28,10 @@ if (strlen($body['password']) < 6) {
 }
 
 $requestedRoleInput = $body['role'] ?? '';
-$requestedRole = is_string($requestedRoleInput) ? strtolower(trim($requestedRoleInput)) : '';
+if (!is_string($requestedRoleInput)) {
+    error('Role must be a string', 422);
+}
+$requestedRole = strtolower(trim($requestedRoleInput));
 if ($requestedRole === 'super_admin') {
     error('Creating super admin accounts via this endpoint is not allowed', 422);
 }

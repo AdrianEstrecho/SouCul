@@ -325,7 +325,7 @@ function adminRoleLabel(value) {
 
 function isSuperAdminSession() {
   const admin = state.admin || api.getStoredAdmin() || {};
-  return String(admin.role || "").toLowerCase() === "super_admin";
+  return normalizeAdminRole(admin.role || "") === "super_admin";
 }
 
 function applySuperAdminAccess() {
@@ -1928,8 +1928,12 @@ async function saveAdmin() {
   const allowedRoles = ["admin", "staff"];
 
   const fullName = `${firstName} ${lastName}`.trim() || username;
-  if (!email || !password || !fullName || !allowedRoles.includes(role)) {
+  if (!email || !password || !fullName) {
     showToast("Fill required admin fields");
+    return;
+  }
+  if (!allowedRoles.includes(role)) {
+    showToast("Invalid role selected");
     return;
   }
 
