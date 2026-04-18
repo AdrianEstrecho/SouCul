@@ -313,7 +313,7 @@ function normalizeAdminRole(value) {
   if (role === "admin" || role === "shop_owner") return "shop_owner";
   if (role === "staff" || role === "inventory_manager") return "inventory_manager";
   if (role === "super_admin") return "super_admin";
-  return "shop_owner";
+  return "";
 }
 
 function adminRoleLabel(value) {

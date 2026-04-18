@@ -41,7 +41,10 @@ $roleMap = [
     'shop_owner' => 'shop_owner',
     'inventory_manager' => 'inventory_manager',
 ];
-$role = $roleMap[$requestedRole] ?? 'shop_owner';
+if (!array_key_exists($requestedRole, $roleMap)) {
+    error('Invalid role selected', 422);
+}
+$role = $roleMap[$requestedRole];
 
 $stmt = $db->prepare(
     "INSERT INTO admins (email, password_hash, full_name, phone, role, is_active)
