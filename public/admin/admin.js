@@ -313,10 +313,11 @@ function normalizeAdminRole(value) {
     .toLowerCase()
     .trim()
     .replace(/[\s-]+/g, "_");
+  // `role` keeps canonical underscore format; `compactRole` also accepts joined forms (e.g. "shopowner").
   const compactRole = role.replace(/_/g, "");
   if (role === "admin" || role === "shop_owner" || compactRole === "shopowner") return "shop_owner";
   if (role === "staff" || role === "inventory_manager" || compactRole === "inventorymanager") return "inventory_manager";
-  if (role === "super_admin" || role === "superadmin") return "super_admin";
+  if (role === "super_admin" || compactRole === "superadmin") return "super_admin";
   return "unknown";
 }
 
