@@ -34,7 +34,6 @@ $roleMap = [
     'staff' => 'inventory_manager',
     'shop_owner' => 'shop_owner',
     'inventory_manager' => 'inventory_manager',
-    'super_admin' => 'super_admin',
 ];
 $role = $roleMap[$requestedRole] ?? 'shop_owner';
 
