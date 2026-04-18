@@ -1498,6 +1498,7 @@ function NotificationsSection() {
   const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [notifLoading, setNotifLoading] = useState(true);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [alertsPage, setAlertsPage] = useState(1);
   const [alertsTotal, setAlertsTotal] = useState(0);
@@ -1650,6 +1651,7 @@ function NotificationsSection() {
   const currentAlertsPage = Math.min(Math.max(alertsPage, 1), alertsTotalPages);
   const alertsRangeStart = alertsTotal > 0 ? ((currentAlertsPage - 1) * ALERTS_PAGE_SIZE) + 1 : 0;
   const alertsRangeEnd = alertsTotal > 0 ? (alertsRangeStart + alerts.length - 1) : 0;
+  const unreadAlertCount = alerts.filter((entry) => !entry.isRead).length;
 
   const changeAlertsPage = (delta) => {
     setAlertsPage((prev) => {
@@ -1679,64 +1681,89 @@ function NotificationsSection() {
         ))}
       </div>
 
-      <div style={{ marginTop: 22 }}>
-        <div className="pd-header" style={{ marginBottom: 10 }}>
-          <h3 className="section-title" style={{ marginBottom: 0, fontSize: 17 }}>Recent Alerts</h3>
-          {alerts.some((entry) => !entry.isRead) && (
-            <button className="edit-btn" onClick={markAllAlertsRead}>Mark all read</button>
-          )}
+      <div className="alerts-modal-trigger" style={{ marginTop: 22 }}>
+        <div>
+          <h3 className="section-title" style={{ marginBottom: 4, fontSize: 17 }}>Recent Alerts</h3>
+          <div className="alerts-trigger-subtext">
+            Open as list modal so you can read alerts without scrolling down this tab.
+          </div>
         </div>
-
-        {notifLoading ? (
-          <div style={EMPTY_STATE_STYLE}>Loading alerts...</div>
-        ) : alerts.length === 0 ? (
-          <div style={EMPTY_STATE_STYLE}>No notification alerts yet.</div>
-        ) : (
-          <>
-            <div className="orders-list">
-              {alerts.map((entry) => {
-              const statusStyle = statusColor[entry.status] || statusColor.pending;
-              return (
-                <div key={entry.id} className="order-card" style={{ opacity: entry.isRead ? 0.82 : 1 }} onClick={() => markAlertRead(entry.id)}>
-                  <div className="order-emoji">{entry.type === "order_status" || entry.type === "order_created" ? "📦" : "🔔"}</div>
-                  <div className="order-info">
-                    <div className="order-id">{entry.title}</div>
-                    <div className="order-meta">{safeDateLabel(entry.createdAt)}</div>
-                    {entry.message && <div className="notif-desc" style={{ marginTop: 6 }}>{entry.message}</div>}
-                  </div>
-                  <div className="order-right" style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                    {entry.status && (
-                      <span className="order-status" style={statusStyle}>{formatStatus(entry.status)}</span>
-                    )}
-                    {!entry.isRead && <span className="default-badge">New</span>}
-                  </div>
-                </div>
-              );
-              })}
-            </div>
-            {alertsTotalPages > 1 && (
-              <div className="alerts-pagination">
-                <span className="alerts-range-info">Showing {alertsRangeStart}-{alertsRangeEnd} of {alertsTotal} alerts</span>
-                <button
-                  className="alerts-page-btn"
-                  onClick={() => changeAlertsPage(-1)}
-                  disabled={currentAlertsPage <= 1}
-                >
-                  Prev
-                </button>
-                <span className="alerts-page-info">Page {currentAlertsPage} of {alertsTotalPages}</span>
-                <button
-                  className="alerts-page-btn"
-                  onClick={() => changeAlertsPage(1)}
-                  disabled={currentAlertsPage >= alertsTotalPages}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
+        <button type="button" className="edit-btn" onClick={() => setShowAlertsModal(true)}>
+          {unreadAlertCount > 0 ? `View Alerts (${unreadAlertCount} new)` : "View Alerts"}
+        </button>
       </div>
+
+      {showAlertsModal && (
+        <Modal title="Recent Alerts" onClose={() => setShowAlertsModal(false)}>
+          <div className="alerts-modal-header-row">
+            <span className="alerts-range-info">
+              {alertsTotal > 0
+                ? `Showing ${alertsRangeStart}-${alertsRangeEnd} of ${alertsTotal} alerts`
+                : "No alerts yet"}
+            </span>
+            {unreadAlertCount > 0 && (
+              <button type="button" className="edit-btn" onClick={markAllAlertsRead}>Mark all read</button>
+            )}
+          </div>
+
+          {notifLoading ? (
+            <div style={EMPTY_STATE_STYLE}>Loading alerts...</div>
+          ) : alerts.length === 0 ? (
+            <div style={EMPTY_STATE_STYLE}>No notification alerts yet.</div>
+          ) : (
+            <ul className="alerts-modal-list">
+              {alerts.map((entry) => {
+                const statusLabel = entry.status ? formatStatus(entry.status) : "";
+                const alertTypeEmoji = entry.type === "order_status" || entry.type === "order_created" ? "📦" : "🔔";
+                return (
+                  <li key={entry.id} className={`alerts-modal-item${entry.isRead ? "" : " unread"}`}>
+                    <button
+                      type="button"
+                      className="alerts-modal-btn"
+                      onClick={() => markAlertRead(entry.id)}
+                    >
+                      <span className="alerts-modal-icon" aria-hidden="true">{alertTypeEmoji}</span>
+                      <span className="alerts-modal-main">
+                        <span className="alerts-modal-title-row">
+                          <span className="alerts-modal-title">{entry.title}</span>
+                          {!entry.isRead && <span className="default-badge">New</span>}
+                        </span>
+                        <span className="alerts-modal-meta">
+                          {safeDateLabel(entry.createdAt)}
+                          {statusLabel ? ` • ${statusLabel}` : ""}
+                        </span>
+                        {entry.message && <span className="alerts-modal-message">{entry.message}</span>}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {alertsTotalPages > 1 && (
+            <div className="alerts-pagination">
+              <button
+                type="button"
+                className="alerts-page-btn"
+                onClick={() => changeAlertsPage(-1)}
+                disabled={currentAlertsPage <= 1}
+              >
+                Prev
+              </button>
+              <span className="alerts-page-info">Page {currentAlertsPage} of {alertsTotalPages}</span>
+              <button
+                type="button"
+                className="alerts-page-btn"
+                onClick={() => changeAlertsPage(1)}
+                disabled={currentAlertsPage >= alertsTotalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2631,6 +2658,91 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .toggle.on { background: linear-gradient(135deg, #2a88b5, #6dcbeb); }
         .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .25s; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
         .toggle.on .toggle-thumb { transform: translateX(20px); }
+        .alerts-modal-trigger {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 0;
+          border-top: 1px solid #e6f0f7;
+        }
+        .alerts-trigger-subtext {
+          font-size: 12px;
+          color: #6b7d8f;
+        }
+        .alerts-modal-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+        .alerts-modal-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          max-height: 380px;
+          overflow-y: auto;
+        }
+        .alerts-modal-item {
+          border: 1px solid #e6f0f7;
+          border-radius: 12px;
+          background: #fbfdff;
+          transition: border-color .2s, background .2s;
+        }
+        .alerts-modal-item.unread {
+          border-color: #b8dbef;
+          background: #f2f9fe;
+        }
+        .alerts-modal-btn {
+          width: 100%;
+          border: 0;
+          background: transparent;
+          font: inherit;
+          color: inherit;
+          cursor: pointer;
+          padding: 12px;
+          display: flex;
+          gap: 10px;
+          text-align: left;
+        }
+        .alerts-modal-icon {
+          font-size: 18px;
+          line-height: 1;
+          margin-top: 1px;
+          flex-shrink: 0;
+        }
+        .alerts-modal-main {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          width: 100%;
+        }
+        .alerts-modal-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .alerts-modal-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #163a59;
+        }
+        .alerts-modal-meta {
+          font-size: 12px;
+          color: #6b7d8f;
+        }
+        .alerts-modal-message {
+          font-size: 12px;
+          color: #4b6074;
+          line-height: 1.45;
+        }
         .alerts-pagination {
           margin-top: 10px;
           display: flex;
@@ -2703,6 +2815,7 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           .pw-tips { grid-template-columns: 1fr; }
           .section-content { padding: 20px; }
           .edit-form { padding: 20px; }
+          .alerts-modal-trigger { align-items: flex-start; flex-direction: column; }
           .order-meta-grid { grid-template-columns: 1fr; }
           .order-top { align-items: flex-start; }
           .order-right { text-align: left; }
