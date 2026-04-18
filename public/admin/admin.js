@@ -313,13 +313,14 @@ function normalizeAdminRole(value) {
   if (role === "admin" || role === "shop_owner") return "shop_owner";
   if (role === "staff" || role === "inventory_manager") return "inventory_manager";
   if (role === "super_admin") return "super_admin";
-  return "";
+  return "unknown";
 }
 
 function adminRoleLabel(value) {
   const normalizedRole = normalizeAdminRole(value);
   if (normalizedRole === "shop_owner") return "Admin";
   if (normalizedRole === "inventory_manager") return "Staff";
+  if (normalizedRole === "unknown") return "Unknown";
   return toTitleCase(normalizedRole);
 }
 
