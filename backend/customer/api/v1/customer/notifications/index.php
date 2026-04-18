@@ -19,18 +19,23 @@ if ($userId <= 0) {
 }
 
 $db = getDB();
-$limit = min(100, max(1, (int) getParam('limit', 20)));
+[$page, $limit, $offset] = getPagination();
 
 try {
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM customer_notifications WHERE user_id = ?");
+    $countStmt->execute([$userId]);
+    $total = (int) $countStmt->fetchColumn();
+
     $stmt = $db->prepare(
         "SELECT id, type, title, message, meta_json, is_read, read_at, created_at
          FROM customer_notifications
          WHERE user_id = ?
          ORDER BY created_at DESC
-         LIMIT ?"
+         LIMIT ? OFFSET ?"
     );
     $stmt->bindValue(1, $userId, PDO::PARAM_INT);
     $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+    $stmt->bindValue(3, $offset, PDO::PARAM_INT);
     $stmt->execute();
 
     $rows = $stmt->fetchAll();
@@ -57,7 +62,7 @@ try {
         ];
     }, $rows);
 
-    success($items, 'Notifications retrieved');
+    paginated($items, $total, $page, $limit);
 } catch (Throwable $e) {
     error('Notifications are unavailable. Run backend/migration.sql first.', 500);
 }

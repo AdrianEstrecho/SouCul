@@ -85,11 +85,25 @@ const ORDER_STATUS_LABELS = {
   confirmed: "Payment Confirmed",
 };
 
+const ORDER_CANCELLATION_REASON_OPTIONS = [
+  { value: "changed_mind", label: "Changed my mind" },
+  { value: "ordered_by_mistake", label: "Ordered by mistake" },
+  { value: "found_better_price", label: "Found a better price elsewhere" },
+  { value: "delivery_takes_too_long", label: "Delivery takes too long" },
+  { value: "payment_issue", label: "Payment issue" },
+  { value: "other", label: "Other" },
+];
+
+const ORDER_CANCELLATION_REASON_LABELS = ORDER_CANCELLATION_REASON_OPTIONS.reduce((map, option) => {
+  map[option.value] = option.label;
+  return map;
+}, {});
+
 const normalizeOrderStatus = (value) => String(value || "").toLowerCase().trim();
 
 const canCancelOrderStatus = (value) => {
   const normalized = normalizeOrderStatus(value);
-  return normalized !== "delivered" && normalized !== "cancelled";
+  return !["waiting_for_courier", "shipped", "to_be_delivered", "delivered", "cancelled"].includes(normalized);
 };
 
 const formatOrderStatusLabel = (value) => {
@@ -123,6 +137,46 @@ const safeDateTimeLabel = (value) => {
 const safeText = (value, fallback = "Not set") => {
   const text = String(value ?? "").trim();
   return text || fallback;
+};
+
+const parseCancellationDetailsFromNotes = (customerNotes) => {
+  const notes = String(customerNotes || "");
+  if (!notes.trim()) return { reason: "", remark: "" };
+
+  const lines = notes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    const match = line.match(/^Cancellation reason:\s*(.+?)(?:\s*\|\s*Remark:\s*(.+))?$/i);
+    if (!match) continue;
+
+    return {
+      reason: String(match[1] || "").trim(),
+      remark: String(match[2] || "").trim(),
+    };
+  }
+
+  return { reason: "", remark: "" };
+};
+
+const getOrderCancellationDetails = (orderDetail) => {
+  if (!orderDetail || typeof orderDetail !== "object") {
+    return { reason: "", remark: "" };
+  }
+
+  const rawReason = String(orderDetail.cancellation_reason_label || orderDetail.cancellation_reason || "").trim();
+  const normalizedReasonKey = String(orderDetail.cancellation_reason || "").trim();
+  const reason = ORDER_CANCELLATION_REASON_LABELS[normalizedReasonKey] || rawReason;
+  const remark = String(orderDetail.cancellation_remark || "").trim();
+
+  if (reason || remark) {
+    return { reason, remark };
+  }
+
+  return parseCancellationDetailsFromNotes(orderDetail.customer_notes);
 };
 
 const resolveProfileImageUrl = (rawUrl) => {
@@ -557,6 +611,14 @@ function OrdersSection() {
   const [cancelingOrderId, setCancelingOrderId] = useState(null);
   const [cancelErrorsById, setCancelErrorsById] = useState({});
   const [orderActionToast, setOrderActionToast] = useState("");
+  const [cancelModal, setCancelModal] = useState({
+    open: false,
+    orderId: null,
+    orderLabel: "",
+    reason: ORDER_CANCELLATION_REASON_OPTIONS[0]?.value || "",
+    remark: "",
+  });
+  const [cancelModalError, setCancelModalError] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -632,7 +694,7 @@ function OrdersSection() {
     }
   };
 
-  const cancelOrder = async (orderId, rawStatus) => {
+  const openCancelOrderModal = (orderId, rawStatus) => {
     const status = normalizeOrderStatus(rawStatus);
     if (!canCancelOrderStatus(status)) {
       setCancelErrorsById((prev) => ({
@@ -642,22 +704,61 @@ function OrdersSection() {
       return;
     }
 
-    const confirmed = window.confirm("Are you sure you want to cancel this order?");
-    if (!confirmed) return;
+    const currentOrder = orders.find((order) => Number(order.id) === Number(orderId));
+    const orderLabel = currentOrder?.order_number ? String(currentOrder.order_number) : `#${orderId}`;
+
+    setCancelErrorsById((prev) => ({ ...prev, [orderId]: "" }));
+    setCancelModalError("");
+    setCancelModal({
+      open: true,
+      orderId,
+      orderLabel,
+      reason: ORDER_CANCELLATION_REASON_OPTIONS[0]?.value || "",
+      remark: "",
+    });
+  };
+
+  const closeCancelOrderModal = () => {
+    if (cancelingOrderId !== null) return;
+
+    setCancelModal((prev) => ({
+      ...prev,
+      open: false,
+    }));
+    setCancelModalError("");
+  };
+
+  const submitCancelOrder = async () => {
+    const orderId = cancelModal.orderId;
+    if (!orderId) {
+      setCancelModalError("Order is invalid. Please try again.");
+      return;
+    }
+
+    const selectedReason = String(cancelModal.reason || "").trim();
+    if (!ORDER_CANCELLATION_REASON_LABELS[selectedReason]) {
+      setCancelModalError("Please select a cancellation reason.");
+      return;
+    }
 
     setCancelingOrderId(orderId);
     setCancelErrorsById((prev) => ({ ...prev, [orderId]: "" }));
+    setCancelModalError("");
 
     try {
       if (!customerAPI || typeof customerAPI.updateOrderStatus !== "function") {
         throw new Error("Order status API is unavailable.");
       }
 
-      const currentOrder = orders.find((order) => Number(order.id) === Number(orderId));
-      const orderLabel = currentOrder?.order_number ? String(currentOrder.order_number) : `#${orderId}`;
+      const orderLabel = cancelModal.orderLabel || `#${orderId}`;
 
-      const result = await customerAPI.updateOrderStatus(orderId, "cancelled");
+      const result = await customerAPI.updateOrderStatus(orderId, "cancelled", {
+        cancellation_reason: selectedReason,
+        cancellation_remark: String(cancelModal.remark || "").trim(),
+      });
       const nextStatus = normalizeOrderStatus(result?.data?.status || "cancelled");
+      const reasonLabel = ORDER_CANCELLATION_REASON_LABELS[selectedReason] || "Selected reason";
+      const remarkValue = String(cancelModal.remark || "").trim();
 
       setOrders((prev) => prev.map((order) => (
         Number(order.id) === Number(orderId)
@@ -669,17 +770,29 @@ function OrdersSection() {
         const detail = prev[orderId];
         if (!detail || typeof detail !== "object") return prev;
 
+        const existingNotes = String(detail.customer_notes || "").trim();
+        const cancellationLine = `Cancellation reason: ${reasonLabel}${remarkValue ? ` | Remark: ${remarkValue}` : ""}`;
+        const customerNotes = existingNotes ? `${existingNotes}\n${cancellationLine}` : cancellationLine;
+
         return {
           ...prev,
           [orderId]: {
             ...detail,
             status: nextStatus,
+            cancellation_reason_label: reasonLabel,
+            cancellation_remark: remarkValue,
+            customer_notes: customerNotes,
           },
         };
       });
 
-      setOrderActionToast(`Order ${orderLabel} was cancelled successfully.`);
+      setOrderActionToast(`Order ${orderLabel} was cancelled successfully (${reasonLabel}).`);
+      setCancelModal((prev) => ({
+        ...prev,
+        open: false,
+      }));
     } catch (error) {
+      setCancelModalError(error?.message || "Failed to cancel order.");
       setCancelErrorsById((prev) => ({
         ...prev,
         [orderId]: error?.message || "Failed to cancel order.",
@@ -734,6 +847,8 @@ function OrdersSection() {
           const displayStatusLabel = formatOrderStatusLabel(rawStatus);
 
           const detailStatusRaw = normalizeOrderStatus(detail?.status || rawStatus);
+          const cancellationDetails = getOrderCancellationDetails(detail);
+          const shouldShowCancellationDetails = detailStatusRaw === "cancelled";
 
           const paymentStatusRaw = String(detail?.payment?.payment_status || "").toLowerCase();
           const paymentStatusLabel = getPaymentStatusLabel({
@@ -763,7 +878,7 @@ function OrdersSection() {
               {canCancel && (
                 <button
                   className="order-cancel-btn"
-                  onClick={() => cancelOrder(o.id, rawStatus)}
+                  onClick={() => openCancelOrderModal(o.id, rawStatus)}
                   disabled={isCanceling}
                 >
                   {isCanceling ? "Cancelling..." : "Cancel Order"}
@@ -815,6 +930,20 @@ function OrdersSection() {
                         Contact: {safeText(detail.shipping_phone, "Not provided")}
                       </div>
                     </div>
+
+                    {shouldShowCancellationDetails && (
+                      <div className="order-cancel-box">
+                        <div className="order-meta-label">Cancellation Details</div>
+                        <div className="order-cancel-row">
+                          <span className="order-cancel-key">Reason</span>
+                          <span className="order-cancel-value">{safeText(cancellationDetails.reason, "Not provided")}</span>
+                        </div>
+                        <div className="order-cancel-row">
+                          <span className="order-cancel-key">Remark</span>
+                          <span className="order-cancel-value order-cancel-remark">{safeText(cancellationDetails.remark, "No additional remark")}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="order-items-box">
                       <div className="order-items-title">Order Items</div>
@@ -881,6 +1010,54 @@ function OrdersSection() {
           );
         })}
       </div>
+
+      {cancelModal.open && (
+        <Modal title={`Cancel ${cancelModal.orderLabel || "Order"}`} onClose={closeCancelOrderModal}>
+          <div className="cancel-order-modal-copy">
+            Please tell us why you want to cancel this order.
+          </div>
+
+          <div className="cancel-reason-list">
+            {ORDER_CANCELLATION_REASON_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={`cancel-reason-option${cancelModal.reason === option.value ? " selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="order-cancel-reason"
+                  value={option.value}
+                  checked={cancelModal.reason === option.value}
+                  onChange={() => setCancelModal((prev) => ({ ...prev, reason: option.value }))}
+                  disabled={cancelingOrderId !== null}
+                />
+                <span className="cancel-reason-title">{option.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="form-group" style={{ marginTop: 12 }}>
+            <label className="form-label">Remark (Optional)</label>
+            <textarea
+              className="form-input cancel-remark-input"
+              placeholder="Add extra details if needed"
+              value={cancelModal.remark}
+              onChange={(e) => setCancelModal((prev) => ({ ...prev, remark: e.target.value.slice(0, 500) }))}
+              disabled={cancelingOrderId !== null}
+            />
+            <div className="cancel-remark-help">{String(cancelModal.remark || "").length}/500</div>
+          </div>
+
+          {cancelModalError && <div className="auth-msg auth-msg-error" style={{ marginTop: 8 }}>{cancelModalError}</div>}
+
+          <div className="modal-actions" style={{ marginTop: 14 }}>
+            <button className="btn-cancel" onClick={closeCancelOrderModal} disabled={cancelingOrderId !== null}>Keep Order</button>
+            <button className="btn-save" onClick={submitCancelOrder} disabled={cancelingOrderId !== null}>
+              {cancelingOrderId !== null ? "Cancelling..." : "Confirm Cancellation"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -1316,10 +1493,14 @@ function PaymentSection() {
 }
 
 function NotificationsSection() {
+  const ALERTS_PAGE_SIZE = 6;
   const [settings, setSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [notifLoading, setNotifLoading] = useState(true);
   const [alerts, setAlerts] = useState([]);
+  const [alertsPage, setAlertsPage] = useState(1);
+  const [alertsTotal, setAlertsTotal] = useState(0);
+  const [alertsTotalPages, setAlertsTotalPages] = useState(1);
   const [savingKey, setSavingKey] = useState(null);
   const [saveError, setSaveError] = useState("");
 
@@ -1331,19 +1512,40 @@ function NotificationsSection() {
       setSaveError("");
 
       try {
-        const [settingsResult, alertsResult] = await Promise.all([
-          customerAPI && typeof customerAPI.getNotificationSettings === "function"
-            ? customerAPI.getNotificationSettings()
-            : Promise.resolve({ data: DEFAULT_NOTIFICATION_SETTINGS }),
-          customerAPI && typeof customerAPI.getNotifications === "function"
-            ? customerAPI.getNotifications({ limit: 20 })
-            : Promise.resolve({ data: [] }),
-        ]);
+        const settingsResult = customerAPI && typeof customerAPI.getNotificationSettings === "function"
+          ? await customerAPI.getNotificationSettings()
+          : { data: DEFAULT_NOTIFICATION_SETTINGS };
         if (!mounted) return;
 
         if (settingsResult?.success && settingsResult.data) {
           setSettings((prev) => ({ ...prev, ...settingsResult.data }));
         }
+      } catch (error) {
+        if (!mounted) return;
+        setSaveError(error?.message || "Failed to load notification settings.");
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadSettings();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAlertsPage = async () => {
+      setNotifLoading(true);
+
+      try {
+        const alertsResult = customerAPI && typeof customerAPI.getNotifications === "function"
+          ? await customerAPI.getNotifications({ page: alertsPage, limit: ALERTS_PAGE_SIZE })
+          : { data: [], meta: { total_pages: 1 } };
+
+        if (!mounted) return;
 
         const rows = Array.isArray(alertsResult?.data) ? alertsResult.data : [];
         const mappedAlerts = rows.map((row) => ({
@@ -1356,21 +1558,29 @@ function NotificationsSection() {
           createdAt: row.created_at,
           isRead: Boolean(row.is_read),
         }));
+
+        const metaTotalPages = Math.max(1, Number(alertsResult?.meta?.total_pages || 1));
+        const metaTotal = Math.max(0, Number(alertsResult?.meta?.total || 0));
         setAlerts(mappedAlerts);
+        setAlertsTotal(metaTotal);
+        setAlertsTotalPages(metaTotalPages);
+
+        if (alertsPage > metaTotalPages) {
+          setAlertsPage(metaTotalPages);
+        }
       } catch (error) {
         if (!mounted) return;
-        setSaveError(error?.message || "Failed to load notification settings.");
+        setSaveError(error?.message || "Failed to load notification alerts.");
       } finally {
         if (mounted) {
-          setIsLoading(false);
           setNotifLoading(false);
         }
       }
     };
 
-    loadSettings();
+    loadAlertsPage();
     return () => { mounted = false; };
-  }, []);
+  }, [alertsPage]);
 
   const markAlertRead = async (alertId) => {
     const id = Number(alertId);
@@ -1435,6 +1645,20 @@ function NotificationsSection() {
     { key: "newsletter", label: "Newsletter", desc: "Weekly curated picks from Ilocos" },
     { key: "sms", label: "SMS Notifications", desc: "Text alerts for important updates" },
   ];
+
+  const currentAlertsPage = Math.min(Math.max(alertsPage, 1), alertsTotalPages);
+  const alertsRangeStart = alertsTotal > 0 ? ((currentAlertsPage - 1) * ALERTS_PAGE_SIZE) + 1 : 0;
+  const alertsRangeEnd = alertsTotal > 0 ? (alertsRangeStart + alerts.length - 1) : 0;
+
+  const changeAlertsPage = (delta) => {
+    setAlertsPage((prev) => {
+      const next = prev + delta;
+      if (next < 1) return 1;
+      if (next > alertsTotalPages) return alertsTotalPages;
+      return next;
+    });
+  };
+
   return (
     <div className="section-content">
       <h3 className="section-title">Notifications</h3>
@@ -1467,8 +1691,9 @@ function NotificationsSection() {
         ) : alerts.length === 0 ? (
           <div style={EMPTY_STATE_STYLE}>No notification alerts yet.</div>
         ) : (
-          <div className="orders-list">
-            {alerts.map((entry) => {
+          <>
+            <div className="orders-list">
+              {alerts.map((entry) => {
               const statusStyle = statusColor[entry.status] || statusColor.pending;
               return (
                 <div key={entry.id} className="order-card" style={{ opacity: entry.isRead ? 0.82 : 1 }} onClick={() => markAlertRead(entry.id)}>
@@ -1486,8 +1711,29 @@ function NotificationsSection() {
                   </div>
                 </div>
               );
-            })}
-          </div>
+              })}
+            </div>
+            {alertsTotalPages > 1 && (
+              <div className="alerts-pagination">
+                <span className="alerts-range-info">Showing {alertsRangeStart}-{alertsRangeEnd} of {alertsTotal} alerts</span>
+                <button
+                  className="alerts-page-btn"
+                  onClick={() => changeAlertsPage(-1)}
+                  disabled={currentAlertsPage <= 1}
+                >
+                  Prev
+                </button>
+                <span className="alerts-page-info">Page {currentAlertsPage} of {alertsTotalPages}</span>
+                <button
+                  className="alerts-page-btn"
+                  onClick={() => changeAlertsPage(1)}
+                  disabled={currentAlertsPage >= alertsTotalPages}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -2046,6 +2292,48 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
           to { opacity: 1; transform: translateY(0); }
         }
 
+        .cancel-order-modal-copy {
+          font-size: 13px;
+          color: #6a7a8a;
+          line-height: 1.5;
+          margin-bottom: 10px;
+        }
+        .cancel-reason-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .cancel-reason-option {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          border: 1.5px solid #dbeaf2;
+          border-radius: 10px;
+          background: #f7fbfd;
+          padding: 10px 12px;
+          cursor: pointer;
+          transition: all .2s;
+        }
+        .cancel-reason-option:hover { border-color: #6dcbeb; background: #eef6fb; }
+        .cancel-reason-option.selected { border-color: #2a88b5; background: #eaf6fc; }
+        .cancel-reason-option input { accent-color: #2a88b5; }
+        .cancel-reason-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: #0a2540;
+        }
+        .cancel-remark-input {
+          min-height: 90px;
+          resize: vertical;
+          line-height: 1.45;
+        }
+        .cancel-remark-help {
+          margin-top: 5px;
+          font-size: 11px;
+          color: #8a99a8;
+          text-align: right;
+        }
+
         .order-detail-panel {
           border-top: 1px solid #e6f0f7;
           padding-top: 12px;
@@ -2095,6 +2383,36 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .order-shipping-sub {
           font-size: 12px;
           color: #6a7a8a;
+        }
+
+        .order-cancel-box {
+          border: 1px solid #f4d6b4;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #fff7ed;
+        }
+        .order-cancel-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 12px;
+          font-size: 13px;
+          color: #7c3e1d;
+          padding: 4px 0;
+        }
+        .order-cancel-key {
+          font-weight: 700;
+          flex-shrink: 0;
+        }
+        .order-cancel-value {
+          text-align: right;
+          font-weight: 600;
+          color: #9a3412;
+          line-height: 1.45;
+        }
+        .order-cancel-remark {
+          white-space: pre-wrap;
+          word-break: break-word;
         }
 
         .order-items-box {
@@ -2312,6 +2630,44 @@ export default function Profile({ userProfile, onUpdateProfile, cartCount = 0, o
         .toggle.on { background: linear-gradient(135deg, #2a88b5, #6dcbeb); }
         .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .25s; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
         .toggle.on .toggle-thumb { transform: translateX(20px); }
+        .alerts-pagination {
+          margin-top: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .alerts-range-info {
+          font-size: 12px;
+          color: #6b7d8f;
+          margin-right: auto;
+        }
+        .alerts-page-info {
+          font-size: 12px;
+          color: #6b7d8f;
+          min-width: 90px;
+          text-align: center;
+        }
+        .alerts-page-btn {
+          border: 1.5px solid #cfe4f2;
+          background: #f7fbfd;
+          color: #0a3a66;
+          font-size: 12px;
+          font-weight: 600;
+          border-radius: 8px;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: all .2s;
+        }
+        .alerts-page-btn:hover:not(:disabled) {
+          border-color: #6dcbeb;
+          background: #eef6fb;
+        }
+        .alerts-page-btn:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
 
         /* ── Security ── */
         .security-list { display: flex; flex-direction: column; gap: 4px; }

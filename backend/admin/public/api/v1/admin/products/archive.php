@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // DELETE /api/v1/admin/products/:id  (soft archive)
-$me = requireAuth();
+$me = requireAdminOrHigher();
 $db = getDB();
 $id = (int) $_route['id'];
 

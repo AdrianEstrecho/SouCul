@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // GET /api/v1/admin/audit
-requireAuth();
+requireSuperAdmin();
 $db = getDB();
 
 [$page, $limit, $offset] = getPagination();

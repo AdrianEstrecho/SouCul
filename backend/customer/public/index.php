@@ -119,6 +119,11 @@ if ($path === '/v1/customer/orders' && $method === 'POST') {
     require __DIR__ . '/../api/v1/customer/orders/create.php';
 }
 
+// ── VOUCHERS ───────────────────────────────────────────────
+if ($path === '/v1/customer/vouchers/validate' && $method === 'GET') {
+    require __DIR__ . '/../api/v1/customer/vouchers/validate.php';
+}
+
 // ── WISHLIST ───────────────────────────────────────────────
 if ($path === '/v1/customer/wishlist' && $method === 'GET') {
     require __DIR__ . '/../api/v1/customer/wishlist/index.php';

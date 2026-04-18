@@ -156,3 +156,40 @@ if (!function_exists('orderWorkflowAllowedTransitions')) {
         return array_values(array_unique($allowed));
     }
 }
+
+if (!function_exists('orderWorkflowRestockOrderItems')) {
+    function orderWorkflowRestockOrderItems(PDO $db, int $orderId): void {
+        $itemsStmt = $db->prepare(
+            "SELECT oi.product_id, oi.product_name, oi.quantity
+             FROM order_items oi
+             WHERE oi.order_id = ?"
+        );
+        $itemsStmt->execute([$orderId]);
+        $orderItems = $itemsStmt->fetchAll();
+
+        if (empty($orderItems)) {
+            throw new RuntimeException('Order has no items to restock.');
+        }
+
+        $restockStmt = $db->prepare(
+            "UPDATE products
+             SET quantity_in_stock = quantity_in_stock + ?
+             WHERE id = ?"
+        );
+
+        foreach ($orderItems as $item) {
+            $qty = max(0, (int) ($item['quantity'] ?? 0));
+            $productId = (int) ($item['product_id'] ?? 0);
+
+            if ($productId <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $restockStmt->execute([$qty, $productId]);
+            if ($restockStmt->rowCount() !== 1) {
+                $productName = (string) ($item['product_name'] ?? ('Product #' . $productId));
+                throw new RuntimeException("Unable to restore stock for {$productName}.");
+            }
+        }
+    }
+}

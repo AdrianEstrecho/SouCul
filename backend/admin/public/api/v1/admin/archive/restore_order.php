@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // PATCH /api/v1/admin/archive/orders/:id/restore
-$me = requireAuth();
+$me = requireAdminOrHigher();
 $db = getDB();
 $id = (int) $_route['id'];
 

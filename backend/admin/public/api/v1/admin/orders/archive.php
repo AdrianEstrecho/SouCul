@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // DELETE /api/v1/admin/orders/:id
-$me = requireAuth();
+$me = requireAdminOrHigher();
 $db = getDB();
 $id = (int) $_route['id'];
 require_once __DIR__ . '/../../../../../../shared/helpers/order_workflow.php';
@@ -31,7 +31,23 @@ if (!in_array('cancelled', $allowedTransitions, true)) {
 // Since the schema uses ENUM, we'll repurpose 'cancelled' and track it via audit,
 // OR you can add is_archived BOOLEAN to orders (recommended — see migration at bottom).
 // For now we mark it cancelled + log archive action so the frontend can filter it out.
-$db->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$id]);
+try {
+	$db->beginTransaction();
+
+	if ($currentStatus !== 'cancelled') {
+		orderWorkflowRestockOrderItems($db, $id);
+	}
+
+	$db->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([$id]);
+
+	$db->commit();
+} catch (Throwable $e) {
+	if ($db->inTransaction()) {
+		$db->rollBack();
+	}
+
+	error('Unable to archive order: ' . $e->getMessage(), 422);
+}
 
 logAudit($db, $me['admin_id'], 'Archive', 'Order', $order['order_number'], 'Order archived');
 success(null, 'Order archived');

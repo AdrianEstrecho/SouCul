@@ -104,6 +104,7 @@ const formatOrderStatusLabel = (value) => {
 export default function Checkout({ cartItems, cartCount, userProfile, directCheckoutItem, onClearDirectCheckout, onOrderPlaced }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const initialVoucherCode = String(location.state?.voucherCode || "").trim();
   const isDirectCheckout = !!directCheckoutItem;
   const checkedItems = cartItems.filter((i) => i.checked);
   const items = isDirectCheckout
@@ -111,7 +112,6 @@ export default function Checkout({ cartItems, cartCount, userProfile, directChec
     : checkedItems;
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const shipping = subtotal > 0 ? 150 : 0;
-  const total = subtotal + shipping;
 
   // Pre-fill from profile
   const nameParts = (userProfile?.name || "").split(" ");
@@ -145,6 +145,14 @@ export default function Checkout({ cartItems, cartCount, userProfile, directChec
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [voucherCode, setVoucherCode] = useState(initialVoucherCode);
+  const [voucherInfo, setVoucherInfo] = useState(null);
+  const [voucherMessage, setVoucherMessage] = useState("");
+  const [voucherError, setVoucherError] = useState("");
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+
+  const voucherDiscount = Number(voucherInfo?.discount_amount || 0);
+  const total = Math.max(0, subtotal + shipping - voucherDiscount);
 
   useEffect(() => {
     const checkoutState = location.state;
@@ -160,6 +168,57 @@ export default function Checkout({ cartItems, cartCount, userProfile, directChec
     setSubmitError("");
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
+
+  const applyVoucher = async () => {
+    const code = String(voucherCode || "").trim().toUpperCase();
+    if (!code) {
+      setVoucherError("Enter a voucher code first.");
+      setVoucherMessage("");
+      setVoucherInfo(null);
+      return;
+    }
+
+    if (subtotal <= 0) {
+      setVoucherError("Add items to your order before applying a voucher.");
+      setVoucherMessage("");
+      setVoucherInfo(null);
+      return;
+    }
+
+    setIsApplyingVoucher(true);
+    setVoucherError("");
+    setVoucherMessage("");
+
+    try {
+      const api = window.CustomerAPI || window.customerAPI;
+      if (!api || typeof api.validateVoucher !== "function") {
+        throw new Error("Voucher API is unavailable. Please refresh and try again.");
+      }
+
+      const result = await api.validateVoucher(code, subtotal);
+      const data = result?.data || {};
+
+      setVoucherInfo({
+        code: String(data.code || code),
+        discount_amount: Number(data.discount_amount || 0),
+      });
+      setVoucherCode(String(data.code || code));
+      setVoucherMessage(`Voucher ${String(data.code || code)} applied.`);
+      setVoucherError("");
+    } catch (error) {
+      setVoucherInfo(null);
+      setVoucherError(error?.message || "Unable to apply voucher.");
+      setVoucherMessage("");
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  const removeVoucher = () => {
+    setVoucherInfo(null);
+    setVoucherMessage("");
+    setVoucherError("");
+  };
 
   const setFieldValue = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -209,6 +268,11 @@ const handlePlaceOrder = async (e) => {
       return;
     }
 
+    if (String(voucherCode || "").trim() && !voucherInfo) {
+      setSubmitError("Please apply your voucher first or clear the voucher field.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
@@ -225,6 +289,10 @@ const handlePlaceOrder = async (e) => {
         shipping_phone: form.phone,
         payment_method: form.paymentMethod,
       };
+
+      if (voucherInfo?.code) {
+        checkoutPayload.voucher_code = String(voucherInfo.code);
+      }
 
       if (isDirectCheckout && directCheckoutItem) {
         checkoutPayload.direct_item = {
@@ -253,7 +321,7 @@ const handlePlaceOrder = async (e) => {
               fromCheckout: true,
               orderData,
               paymentMethod: form.paymentMethod,
-              orderTotal: total,
+              orderTotal: Number(orderData?.total_amount || total),
               itemCount: items.length,
             },
           });
@@ -261,7 +329,7 @@ const handlePlaceOrder = async (e) => {
         }
 
         setIsPaidOnline(false);
-        setPlacedSummary({ orderTotal: total, itemCount: items.length });
+        setPlacedSummary({ orderTotal: Number(orderData?.total_amount || total), itemCount: items.length });
         setPlacedOrder(orderData);
         setPlaced(true);
       } else {
@@ -281,6 +349,8 @@ const handlePlaceOrder = async (e) => {
     const placedPaymentMethod = placedOrder?.payment_method || form.paymentMethod;
     const placedPaymentStatus = placedOrder?.payment_status || (isPaidOnline ? "completed" : "pending");
     const placedOrderStatus = placedOrder?.order_status || (isPaidOnline ? "online_payment_processed" : "online_payment_requested");
+    const placedVoucherCode = String(placedOrder?.voucher_code || "").trim();
+    const placedVoucherDiscount = Number(placedOrder?.voucher_discount_amount || 0);
 
     return (
       <div className="soucul-app checkout-page">
@@ -305,6 +375,8 @@ const handlePlaceOrder = async (e) => {
             <span>Payment Method: <strong>{formatPaymentMethodLabel(placedPaymentMethod)}</strong></span>
             <span>Payment Status: <strong>{formatPaymentStatusLabel({ paymentMethod: placedPaymentMethod, paymentStatus: placedPaymentStatus })}</strong></span>
             <span>Order Status: <strong>{formatOrderStatusLabel(placedOrderStatus)}</strong></span>
+            {placedVoucherCode && <span>Voucher: <strong>{placedVoucherCode}</strong></span>}
+            {placedVoucherDiscount > 0 && <span>Discount Applied: <strong>-₱{placedVoucherDiscount.toLocaleString()}</strong></span>}
           </div>
           <button className="checkout-back-btn" onClick={() => navigate("/")}>
             Back to Home
@@ -598,6 +670,46 @@ const handlePlaceOrder = async (e) => {
                 </div>
               ))}
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <label className="checkout-field checkout-field-full" style={{ marginBottom: 8 }}>
+                <span>Voucher Code</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    value={voucherCode}
+                    onChange={(e) => {
+                      setVoucherCode(e.target.value);
+                      setVoucherError("");
+                      setVoucherMessage("");
+                    }}
+                    placeholder="Enter voucher code"
+                    style={{ flex: 1 }}
+                    className={voucherError ? "checkout-input-error" : ""}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyVoucher}
+                    disabled={isApplyingVoucher}
+                    className="checkout-back-btn"
+                    style={{ minWidth: 96, padding: "10px 14px" }}
+                  >
+                    {isApplyingVoucher ? "Applying..." : "Apply"}
+                  </button>
+                </div>
+              </label>
+
+              {voucherInfo?.code && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", fontSize: 12, color: "#14532d", marginTop: 2 }}>
+                  <span>Applied: {voucherInfo.code}</span>
+                  <button type="button" onClick={removeVoucher} style={{ border: "none", background: "transparent", color: "#1f6fb2", cursor: "pointer", fontWeight: 700 }}>
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {voucherMessage && <div style={{ fontSize: 12, color: "#166534", marginTop: 6 }}>{voucherMessage}</div>}
+              {voucherError && <div className="checkout-field-error" style={{ marginTop: 6 }}>{voucherError}</div>}
+            </div>
             <div className="checkout-totals">
               <div className="checkout-totals-row">
                 <span>Subtotal</span>
@@ -607,6 +719,12 @@ const handlePlaceOrder = async (e) => {
                 <span>Shipping</span>
                 <span>₱{shipping.toLocaleString()}</span>
               </div>
+              {voucherDiscount > 0 && (
+                <div className="checkout-totals-row" style={{ color: "#166534" }}>
+                  <span>Voucher Discount</span>
+                  <span>-₱{voucherDiscount.toLocaleString()}</span>
+                </div>
+              )}
               <div className="checkout-totals-row checkout-totals-final">
                 <span>Total</span>
                 <span>₱{total.toLocaleString()}</span>

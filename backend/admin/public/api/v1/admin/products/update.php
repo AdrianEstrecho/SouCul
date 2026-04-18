@@ -52,7 +52,7 @@ function resolveManagedProductImagePath(?string $imageUrl, string $publicRoot): 
     return $real;
 }
 
-$me   = requireAuth();
+$me   = requireAdminOrHigher();
 $db   = getDB();
 $body = getBody();
 $id   = (int) $_route['id'];

@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // POST /api/v1/admin/products
-$me   = requireAuth();
+$me   = requireAdminOrHigher();
 $db   = getDB();
 $body = getBody();
 requireFields($body, ['name', 'description', 'category', 'subcategory', 'price']);

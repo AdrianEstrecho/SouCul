@@ -184,7 +184,9 @@ export default function Cart({ cartItems = [], onUpdateQty = () => {}, onRemove 
           </div>
 
           <button
-            onClick={() => navigate("/Checkout")}
+            onClick={() => navigate("/Checkout", {
+              state: { voucherCode: String(voucher || "").trim() }
+            })}
             disabled={selectedItems.length === 0}
             style={{
               background: selectedItems.length === 0 ? "rgba(255,255,255,0.2)" : "#6dcbeb",

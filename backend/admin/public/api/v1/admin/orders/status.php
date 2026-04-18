@@ -52,45 +52,11 @@ if ($status === $old) {
     success(['status' => $status], 'Order status unchanged');
 }
 
-// Deduct stock once the order is waiting for courier pickup.
-$shouldDeductStock = ($old !== 'waiting_for_courier' && $status === 'waiting_for_courier');
-
 try {
     $db->beginTransaction();
 
-    if ($shouldDeductStock) {
-        $itemsStmt = $db->prepare(
-            "SELECT oi.product_id, oi.product_name, oi.quantity
-             FROM order_items oi
-             WHERE oi.order_id = ?"
-        );
-        $itemsStmt->execute([$id]);
-        $orderItems = $itemsStmt->fetchAll();
-
-        if (empty($orderItems)) {
-            throw new RuntimeException('Order has no items to fulfill.');
-        }
-
-        $decrementStmt = $db->prepare(
-            "UPDATE products
-             SET quantity_in_stock = quantity_in_stock - ?
-             WHERE id = ? AND quantity_in_stock >= ?"
-        );
-
-        foreach ($orderItems as $item) {
-            $qty = max(0, (int) ($item['quantity'] ?? 0));
-            $productId = (int) ($item['product_id'] ?? 0);
-
-            if ($productId <= 0 || $qty <= 0) {
-                continue;
-            }
-
-            $decrementStmt->execute([$qty, $productId, $qty]);
-            if ($decrementStmt->rowCount() !== 1) {
-                $productName = (string) ($item['product_name'] ?? ('Product #' . $productId));
-                throw new RuntimeException("Insufficient stock for {$productName}.");
-            }
-        }
+    if ($status === 'cancelled') {
+        orderWorkflowRestockOrderItems($db, $id);
     }
 
     $db->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$status, $id]);
