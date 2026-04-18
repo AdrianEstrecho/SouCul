@@ -11,7 +11,7 @@ BSIT/IT22S1
 */
 
 // POST /api/v1/admin/uploads/product-image
-$me = requireAuth();
+$me = requireAdminOrHigher();
 
 function imageCreateFromMime(string $mime, string $path): ?GdImage {
     return match ($mime) {

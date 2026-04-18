@@ -33,14 +33,61 @@ function requireAuth(): array {
     return $payload; // ['admin_id', 'email', 'role', 'exp', 'iat']
 }
 
-function requireSuperAdmin(): array {
-    $payload = requireAuth();
-    $role = strtolower(trim((string)($payload['role'] ?? '')));
-    $normalizedRole = preg_replace('/[\s-]+/', '_', $role);
-    $allowedRoles = ['super_admin', 'superadmin'];
+function normalizeAdminRole(string $role): string {
+    $normalized = strtolower(trim($role));
+    $normalized = preg_replace('/[\s-]+/', '_', $normalized) ?? '';
+    $compact = str_replace('_', '', $normalized);
 
-    if (!in_array($normalizedRole, $allowedRoles, true)) {
-        error('Forbidden — super admin access required', 403);
+    if ($normalized === 'super_admin' || $compact === 'superadmin') {
+        return 'super_admin';
     }
+    if ($normalized === 'shop_owner' || $normalized === 'admin' || $compact === 'shopowner') {
+        return 'shop_owner';
+    }
+    if ($normalized === 'inventory_manager' || $normalized === 'staff' || $compact === 'inventorymanager') {
+        return 'inventory_manager';
+    }
+
+    return $normalized;
+}
+
+function adminRoleRank(string $role): int {
+    $normalized = normalizeAdminRole($role);
+    return match ($normalized) {
+        'inventory_manager' => 10,
+        'shop_owner' => 20,
+        'super_admin' => 30,
+        default => 0,
+    };
+}
+
+function requireRoleAtLeast(string $minimumRole): array {
+    $payload = requireAuth();
+    $currentRole = normalizeAdminRole((string)($payload['role'] ?? ''));
+    $requiredRole = normalizeAdminRole($minimumRole);
+
+    if (adminRoleRank($requiredRole) <= 0) {
+        error('Server role configuration error', 500);
+    }
+
+    if (adminRoleRank($currentRole) < adminRoleRank($requiredRole)) {
+        $requiredLabel = match ($requiredRole) {
+            'super_admin' => 'super admin',
+            'shop_owner' => 'admin',
+            'inventory_manager' => 'staff',
+            default => 'authorized',
+        };
+        error("Forbidden — {$requiredLabel} access required", 403);
+    }
+
+    $payload['role'] = $currentRole;
     return $payload;
+}
+
+function requireAdminOrHigher(): array {
+    return requireRoleAtLeast('shop_owner');
+}
+
+function requireSuperAdmin(): array {
+    return requireRoleAtLeast('super_admin');
 }

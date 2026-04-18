@@ -29,10 +29,30 @@ if ($requestedStatus !== 'cancelled') {
     error('Customers can only update order status to Cancelled.', 403);
 }
 
+$cancellationReasonInput = strtolower(trim((string) ($body['cancellation_reason'] ?? '')));
+$cancellationReasonMap = [
+    'changed_mind' => 'Changed my mind',
+    'ordered_by_mistake' => 'Ordered by mistake',
+    'found_better_price' => 'Found a better price elsewhere',
+    'delivery_takes_too_long' => 'Delivery takes too long',
+    'payment_issue' => 'Payment issue',
+    'other' => 'Other',
+];
+
+if (!array_key_exists($cancellationReasonInput, $cancellationReasonMap)) {
+    error('Please select a valid cancellation reason.', 422);
+}
+
+$cancellationReasonLabel = $cancellationReasonMap[$cancellationReasonInput];
+$cancellationRemark = trim((string) ($body['cancellation_remark'] ?? ''));
+if (strlen($cancellationRemark) > 500) {
+    error('Cancellation remark must be 500 characters or less.', 422);
+}
+
 $db = getDB();
 
 $stmt = $db->prepare(
-    "SELECT o.id, o.order_number, o.user_id, o.status,
+    "SELECT o.id, o.order_number, o.user_id, o.status, o.customer_notes,
             (
                 SELECT p.payment_method
                 FROM payments p
@@ -50,6 +70,12 @@ if (!$order) {
 }
 
 $currentStatus = orderWorkflowNormalizeStatus((string) ($order['status'] ?? ''));
+
+if (in_array($currentStatus, ['waiting_for_courier', 'shipped', 'to_be_delivered', 'delivered'], true)) {
+    $fromLabel = orderWorkflowFormatStatusLabel($currentStatus);
+    error("Order can no longer be cancelled once it is {$fromLabel}.", 422);
+}
+
 $paymentMethod = orderWorkflowResolvePaymentMethod((string) ($order['payment_method'] ?? ''), $currentStatus);
 $allowedTransitions = orderWorkflowAllowedTransitions($currentStatus, $paymentMethod);
 
@@ -63,19 +89,49 @@ if ($requestedStatus === $currentStatus) {
     success(['status' => $requestedStatus], 'Order status unchanged');
 }
 
-$db->prepare("UPDATE orders SET status = ? WHERE id = ?")->execute([$requestedStatus, $orderId]);
+$cancellationDetails = "Cancellation reason: {$cancellationReasonLabel}";
+if ($cancellationRemark !== '') {
+    $cancellationDetails .= " | Remark: {$cancellationRemark}";
+}
+
+$existingNotes = trim((string) ($order['customer_notes'] ?? ''));
+$nextCustomerNotes = $existingNotes === ''
+    ? $cancellationDetails
+    : $existingNotes . "\n" . $cancellationDetails;
+
+try {
+    $db->beginTransaction();
+
+    if ($requestedStatus === 'cancelled') {
+        orderWorkflowRestockOrderItems($db, $orderId);
+    }
+
+    $db->prepare("UPDATE orders SET status = ?, customer_notes = ? WHERE id = ?")
+        ->execute([$requestedStatus, $nextCustomerNotes, $orderId]);
+
+    $db->commit();
+} catch (Throwable $e) {
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+
+    error('Unable to cancel order: ' . $e->getMessage(), 422);
+}
 
 $newStatusLabel = orderWorkflowFormatStatusLabel($requestedStatus);
 createCustomerNotification(
     $db,
     $userId,
     'Order cancelled',
-    "Your order {$order['order_number']} has been cancelled.",
+    "Your order {$order['order_number']} has been cancelled. Reason: {$cancellationReasonLabel}.",
     'order_status',
     [
         'order_id' => $orderId,
         'order_number' => $order['order_number'],
         'status' => $requestedStatus,
+        'cancellation_reason' => $cancellationReasonInput,
+        'cancellation_reason_label' => $cancellationReasonLabel,
+        'cancellation_remark' => $cancellationRemark !== '' ? $cancellationRemark : null,
     ]
 );
 
@@ -93,13 +149,17 @@ try {
             $db,
             $adminId,
             'Order cancelled by customer',
-            "Order {$order['order_number']} was cancelled by the customer.",
+            "Order {$order['order_number']} was cancelled by the customer. Reason: {$cancellationReasonLabel}" .
+                ($cancellationRemark !== '' ? ". Remark: {$cancellationRemark}" : '.'),
             'order_status',
             [
                 'order_id' => $orderId,
                 'order_number' => $order['order_number'],
                 'status' => $requestedStatus,
                 'source' => 'customer',
+                'cancellation_reason' => $cancellationReasonInput,
+                'cancellation_reason_label' => $cancellationReasonLabel,
+                'cancellation_remark' => $cancellationRemark !== '' ? $cancellationRemark : null,
             ]
         );
     }
@@ -107,4 +167,10 @@ try {
     error_log('Unable to create admin cancellation notifications: ' . $e->getMessage());
 }
 
-success(['status' => $requestedStatus, 'label' => $newStatusLabel], 'Order status updated');
+success([
+    'status' => $requestedStatus,
+    'label' => $newStatusLabel,
+    'cancellation_reason' => $cancellationReasonInput,
+    'cancellation_reason_label' => $cancellationReasonLabel,
+    'cancellation_remark' => $cancellationRemark !== '' ? $cancellationRemark : null,
+], 'Order status updated');
